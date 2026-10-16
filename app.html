@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lot Outline — new order</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="places.js"></script>
+<script src="satellite.js"></script>
+<script src="orders.js"></script>
+<script>document.documentElement.style.visibility="hidden";LO.requireLogin().then(s=>{if(s){document.documentElement.style.visibility="";LO.profile().then(p=>{const u=document.getElementById("who");if(u&&p)u.textContent=p.full_name||p.email||"";});}});</script>
+<link rel="preconnect" href="https://services.arcgis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="lo.css">
+<style>
+/* One centered column, one decision per step. */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 0}
+.top .meta{display:flex;align-items:center;gap:14px;font-size:14px;color:var(--muted)}
+.top .who{color:var(--fg);font-weight:600;text-decoration:none;border-bottom:1.5px solid transparent;transition:border-color .18s ease-out}.top .who:hover{border-color:var(--accent)}
+.saved{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}.saved::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}.saved.busy::before{background:#D9B84A}.saved.bad::before{background:#c0392b}
+.resume{margin:14px 0 0;font-size:15px;color:var(--fg-2)}.resume a{color:var(--accent);font-weight:600}
+.reopen{position:fixed;inset:0;background:rgba(251,251,248,.92);display:flex;align-items:center;justify-content:center;z-index:50;font-size:17px;font-weight:600;color:var(--fg)}.reopen[hidden]{display:none}
+.top .meta .pill{padding:8px 12px;border-radius:10px;background:var(--surface);font-weight:600;color:var(--fg)}
+.top .meta .pill:empty{display:none}
+.prog{max-width:760px;margin:30px auto 0;display:flex;flex-direction:column;gap:10px}
+.prog .labels{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--faint)}
+.prog .labels span{display:block;padding:0;min-height:0;margin:0;background:none}
+.prog .labels span.done{color:var(--fg)} .prog .labels span.now{color:var(--accent)}
+.prog .labels span.nav{cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}.prog .labels span.nav:hover{color:var(--accent);text-decoration-color:var(--accent)}.prog .labels span.nav:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.prog .bar{position:relative;height:4px;background:var(--surface);border-radius:4px}
+.prog .bar i{position:absolute;left:0;top:0;height:100%;width:0;background:var(--accent);border-radius:4px;transition:width 300ms var(--ease)}
+@media (max-width:600px){.prog .labels span:not(.now){display:none}.prog .labels{justify-content:center}}
+
+main{padding:36px 0 56px}
+.screen{display:none;flex-direction:column;gap:24px;animation:in 220ms var(--ease)}
+.screen.on{display:flex}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.head h1{font-size:clamp(28px,4vw,38px)}
+.head p{margin:6px 0 0;color:var(--fg-2)}
+.col{max-width:640px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:20px}
+.acts{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;max-width:640px;margin:8px auto 0}
+.acts p{margin:0;font-size:14px;color:var(--muted)}
+
+/* step 1 */
+.ac{position:relative}
+.sugg{position:absolute;left:0;right:0;top:100%;z-index:5;background:#fff;border:1px solid var(--line);border-radius:var(--r);margin-top:6px;overflow:hidden;box-shadow:0 16px 40px -20px rgba(30,42,34,.35)}
+.sugg div{padding:12px 16px;cursor:pointer;font-size:15px}
+.sugg div.mark{background:var(--surface)}
+.parcel{display:flex;gap:14px;align-items:center;padding:16px 18px;border-radius:var(--r);background:var(--surface);opacity:0;transform:translateY(4px);transition:opacity 300ms var(--ease),transform 300ms var(--ease)}
+.parcel.in{opacity:1;transform:none}
+.parcel .map{width:72px;height:54px;border-radius:8px;background:#DCE5DD;flex:none;display:grid;place-items:center}
+.parcel b{display:block;font-size:18px} .parcel span{font-size:15px;color:var(--muted);line-height:1.45}
+.pbody{min-width:0;flex:1}
+.placing{display:flex;align-items:center;gap:10px;background:#FFF6D6;border:1.5px solid #F2D77A;border-radius:12px;padding:12px 16px;font-size:14.5px;font-weight:600;margin:0 0 12px}.placing .think{margin:0}.placing .think[hidden]{display:none}
+.think{display:flex;align-items:center;gap:4px;margin-top:6px}.think i{width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.25;animation:thk 1s infinite ease-in-out}.think i:nth-child(2){animation-delay:.15s}.think i:nth-child(3){animation-delay:.3s}.think span{margin-left:6px;color:var(--fg-2,#4C5A50)}
+@keyframes thk{0%,100%{opacity:.25;transform:none}50%{opacity:1;transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){.think i{animation:none;opacity:.6}}
+.pids{display:flex;flex-direction:column;gap:6px;margin-top:10px}.pids:empty{display:none}
+.prow{display:grid;grid-template-columns:auto auto minmax(0,1fr) 26px;gap:6px 16px;align-items:start;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 12px 13px 16px}.prow dl:not(:nth-of-type(3)) dd{white-space:nowrap}.prow dd small{display:block;font-size:14px;font-weight:600;color:var(--muted)}
+.prow dl{margin:0;min-width:0}.prow dt{font-size:13px;color:var(--muted);letter-spacing:.02em}.prow dd{margin:3px 0 0;font-size:17px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
+.prow .prm{border:0;background:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px 4px;align-self:center}.prow .pnum{grid-column:1/-1;font-size:14px;font-weight:700;color:var(--accent)}
+.ptot{font-size:15px;color:var(--muted);padding:4px 2px 0}.ptot b{display:inline;font-size:15px;color:var(--fg)}
+@media (max-width:560px){.prow{grid-template-columns:1fr 1fr 26px}.prow dl:not(:nth-of-type(3)) dd{white-space:normal}.prow dl:nth-of-type(3){grid-column:1/3}}
+.pid{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 10px;font-size:13px;color:var(--muted)}.pid b{display:inline;font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums}.pid button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 4px}.pid.solo{padding-right:10px}
+.findp{margin:-4px 0 4px;display:flex;flex-direction:column;gap:10px}
+.perr{margin:0;padding:14px 16px;border-radius:12px;background:#FDF1E6;border:1px solid #F1CFAE;color:#7A3A10;font-size:16px;line-height:1.45}.perr b{color:#7A3A10}.perr:empty{display:none}
+.findrow{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:10px}.findrow .lbl{display:block;margin-bottom:4px}.cty{position:relative}
+.cty .sugg{position:absolute;left:0;right:0;top:100%;z-index:20;max-height:260px;overflow:auto}.findp .lbl{font-size:14px}#findClosest{font-size:15.5px}.cty .sugg small{color:var(--muted);font-weight:500;margin-left:6px}.cty .sugg .off{color:var(--muted)}
+@media (max-width:520px){.findrow{grid-template-columns:1fr}}
+.morep{margin:-4px 0 4px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.addbtn{display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border-radius:12px;border:2px solid var(--accent);background:#fff;color:var(--accent);font:inherit;font-size:18px;font-weight:700;cursor:pointer;transition:background 160ms var(--ease)}
+.addbtn:hover{background:var(--surface)}.addbtn i{font-style:normal;font-size:24px;line-height:1;font-weight:600}.addbtn[hidden]{display:none}
+.pfee{font-size:15px;color:var(--muted);margin:0}.addfee{margin-top:-2px;font-weight:600;color:var(--fg)}
+.pintools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
+.ptool{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:11px;border:2px solid var(--line);background:#fff;color:var(--fg);font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.ptool:hover{border-color:var(--accent);color:var(--accent)}.ptool i{font-style:normal;font-size:20px;line-height:1}#pAdd{border-color:var(--accent);color:var(--accent)}
+.ptool:disabled{opacity:.45;cursor:default}.pcount{font-size:15px;color:var(--muted);margin-left:4px}#findOpen{font-size:15.5px}
+.morep .addp{width:100%}.morep .addp .field,.morep .addp .btn,.findp .field,.findp .btn{font-size:17px}#donePBtn{margin-top:10px}.addp{display:flex;gap:8px;margin-top:6px}.addp .field{flex:1;min-width:0;font-variant-numeric:tabular-nums}.addp select.field{flex:none;width:auto;padding-right:28px}.innerchk{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer}.innerchk input{width:18px;height:18px;accent-color:var(--accent)}.addpin{position:relative;flex:1;min-width:0}.addpin .field{width:100%}.addpin .sugg{z-index:20;max-height:260px;overflow:auto}.addpmsg{font-size:15.5px;color:#9A4A16;margin:6px 0 0}.addpmsg.ok{color:var(--accent)}
+.linkbtn{background:none;border:0;padding:6px 0;color:var(--muted);text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}
+.try{font-size:14px;color:var(--muted);text-align:center}
+.paths{display:grid;grid-template-columns:1fr 1fr;gap:12px;opacity:0;transform:translateY(4px);transition:opacity 300ms var(--ease),transform 300ms var(--ease)}
+.paths.in{opacity:1;transform:none}
+@media (max-width:600px){.paths{grid-template-columns:1fr}}
+.path{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:18px 20px;border-radius:var(--r-lg);border:1.5px solid var(--line);background:#fff;cursor:pointer;transition:border-color .15s,background .15s,transform .12s var(--ease)}
+.path:hover{border-color:var(--accent);background:var(--surface)} .path:active{transform:scale(.99)}
+.path.main{background:var(--accent);border-color:var(--accent);color:#fff} .path.main:hover{background:var(--accent-hover)}
+.path b{font-size:17px;font-family:var(--display)} .path span{font-size:14px;color:var(--muted)} .path.main span{color:rgba(255,255,255,.8)}
+
+/* satellite kit */
+.kit{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.kit .it{display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:var(--r-lg);background:var(--surface)}
+.kit .it .ic{width:44px;height:44px;border-radius:12px;background:#fff;display:grid;place-items:center}
+.kit .it b{font-size:16px} .kit .it span{font-size:14px;color:var(--muted)}
+.kitline{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--fg-2);padding:0 4px}
+.kitline b{font-family:var(--display);font-size:24px;color:var(--fg)}
+.lcheck{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:var(--r-lg);border:1.5px dashed var(--line);margin:0 0 16px}
+.lcheck b{font-family:var(--display);font-size:17px} .lcheck>span{font-size:14px;color:var(--muted)}
+.lcheck ul{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.lcheck li::before{content:'\2715';display:inline-block;width:22px;color:#D7262E;font-weight:700} .lcheck li.ok::before{content:'\2713';color:var(--accent)}
+.apptkit{margin-top:16px;padding:16px 18px;border-radius:var(--r-lg);background:#FFF6D6;border:1px solid #F2D77A;display:flex;flex-direction:column;gap:8px}
+.apptkit b{font-family:var(--display);font-size:17px} .apptkit p{margin:0;font-size:14px;color:var(--fg-2)}
+.fine{font-size:13px;color:var(--muted);margin:0;line-height:1.55}
+.busy{display:flex;align-items:center;gap:12px;justify-content:center;font-size:15px;color:var(--fg-2)}
+.busy i{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.errbox{padding:14px 16px;border-radius:var(--r);background:#FBE9E9;color:var(--err);font-size:14px;font-weight:600}
+.try button{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+/* step 2 + 4 grids */
+.intake{display:grid;grid-template-columns:1.25fr auto 1fr;gap:14px;align-items:stretch;margin-bottom:18px}
+@media (max-width:820px){.intake{grid-template-columns:1fr}.orsep{padding:2px 0}}
+.drop{border:2.5px dashed var(--accent);border-radius:var(--r-lg);padding:34px 20px;text-align:center;color:var(--muted);cursor:pointer;background:#EEF5EF;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:background .15s,transform .15s,box-shadow .15s}
+.drop.over,.drop:hover{background:#E1EEE4;box-shadow:0 6px 18px rgba(47,122,86,.14);transform:translateY(-1px)}
+.drop:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.dropic{width:58px;height:58px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;margin-bottom:6px}
+.drop b{display:block;color:var(--fg);font-size:21px}.dropsub{font-size:14px}.dropsub u{color:var(--accent);font-weight:700}
+.orsep{display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.harcard{background:#FFF6D6;border:1.5px solid #F2D77A;border-radius:var(--r-lg);padding:22px;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.harcard b{font-size:19px;color:var(--fg)}.harcard>span{font-size:14px;color:var(--fg-2,#4C5A50)}
+.harcard .harrow{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.harcard .harrow .field{flex:1 1 200px;background:#fff}
+@media (prefers-reduced-motion:reduce){.drop,.drop:hover{transition:none;transform:none}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.th{position:relative;border-radius:12px;overflow:hidden;background:var(--surface);aspect-ratio:3/2;animation:pop 240ms var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.th img,.th canvas{width:100%;height:100%;object-fit:cover;display:block}
+.th .n{position:absolute;left:8px;bottom:6px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.th .x{position:absolute;right:6px;top:6px;width:28px;height:28px;border-radius:8px;border:0;background:rgba(255,255,255,.9);cursor:pointer;display:grid;place-items:center}
+.th.wait::after{content:"";position:absolute;inset:0;background:rgba(251,251,248,.6)}
+.th.ok .n{color:#fff}
+.th.flag{outline:3px solid var(--warn);outline-offset:-3px;cursor:pointer;animation:pop 240ms var(--ease) both,ring 600ms var(--ease) 240ms 1}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(185,119,28,.6)}100%{box-shadow:0 0 0 14px rgba(185,119,28,0)}}
+.th .flagmsg{position:absolute;inset:auto 0 0 0;padding:8px 10px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:700}
+.count{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;color:var(--fg-2)}
+.count b{font-family:var(--display);font-size:24px;color:var(--fg);transition:opacity 260ms}
+
+/* step 3 canvas */
+.res{font-size:17px;line-height:1.4;color:var(--fg);margin:0 0 14px;padding:14px 18px;border-radius:12px;background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1.5px solid var(--accent);display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.res b{color:var(--fg);font-weight:800;font-size:1.1em}
+.res .tag{flex:none;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:var(--accent);color:#fff;margin-top:2px}
+#grid6 .th{cursor:zoom-in}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(10,12,10,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
+.lb[hidden],.seg[hidden]{display:none}
+.lb canvas{max-width:100%;max-height:calc(100vh - 110px);width:auto;height:auto;border-radius:var(--r-lg);display:block;cursor:zoom-out}
+.lb .bar{display:flex;gap:10px;align-items:center;color:#ddd;font-size:14px}
+.lb .bar b{color:#fff}
+.lb button{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:999px;width:40px;height:40px;font-size:20px;cursor:pointer}
+.lb button:hover{background:rgba(255,255,255,.22)}
+.lb .x{position:absolute;top:14px;right:14px}
+.pinwrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.ref{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);padding:14px 14px 12px;box-shadow:0 24px 48px -28px rgba(30,42,34,.3)}
+.ref b{display:block;font-size:15px;margin-bottom:4px}.ref p{margin:0 0 10px;font-size:13px;line-height:1.45;color:var(--muted,#55615a)}
+.ref img{display:block;width:100%;border-radius:12px;cursor:zoom-in}.ref small{display:block;margin-top:8px;font-size:12px;color:var(--muted,#55615a)}
+@media (max-width:900px){.pinwrap{grid-template-columns:1fr}}
+.stage{position:relative;border-radius:var(--r-xl);overflow:hidden;background:#111;height:min(66vh,760px);min-height:320px;box-shadow:0 24px 48px -28px rgba(30,42,34,.5)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+.stage .cap{position:absolute;right:16px;top:14px;padding:8px 12px;border-radius:10px;background:#fff;font-size:13px;font-weight:600}
+.stage .zoom{position:absolute;left:14px;top:14px;display:flex;gap:4px;background:#fff;border-radius:10px;padding:4px}
+.stage .zoom button{border:0;background:none;min-width:34px;height:32px;border-radius:7px;font-weight:700;cursor:pointer}
+.stage .zoom button:hover{background:var(--surface)}
+.stage .zoom .z{min-width:44px;display:grid;place-items:center;font-size:12px;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);text-align:center;margin:0}
+.hint b{color:var(--fg-2);font-weight:600}
+
+/* step 5 look */
+.look{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+@media (max-width:900px){.look{grid-template-columns:minmax(0,1fr)}}
+.big{position:relative;border-radius:var(--r-xl);overflow:hidden;background:#111;aspect-ratio:16/10}
+.big canvas{width:100%;height:100%;object-fit:contain;display:block}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px}
+.strip .th{flex:0 0 110px;aspect-ratio:3/2;animation:none;cursor:pointer;outline:3px solid transparent;outline-offset:-3px}
+.strip .th.active{outline-color:var(--accent)}
+.sheet{background:var(--surface);border-radius:var(--r-lg);padding:20px;display:flex;flex-direction:column;gap:14px}
+.sheet h3{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.sw button{padding:0;aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer}
+.sw button.on{border-color:var(--fg)}
+.pick{display:flex;align-items:center;gap:8px}
+.pick input[type=color]{width:40px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
+.pick input[type=text]{width:96px;min-height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--line);font-size:13px}
+.rg{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;font-size:14px}
+.rg .v{font-size:13px;color:var(--muted);min-width:44px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#fff;border-radius:10px;padding:4px}
+.seg button{border:0;background:none;padding:9px 8px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button small{display:block;font-weight:500;font-size:11px;opacity:.8}
+#dash.seg4{grid-template-columns:repeat(4,1fr);gap:3px;margin-top:10px}#dash.seg4 button{padding:8px 2px}#dash.seg4 svg{display:block;margin:2px auto 3px;width:100%;max-width:44px}
+#blend.seg{grid-template-columns:1fr 1fr 1fr;gap:3px}#blend.seg button{padding:9px 4px}
+
+/* step 6 pay */
+.pay{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+@media (max-width:900px){.pay{grid-template-columns:minmax(0,1fr)}}
+.bill{background:var(--surface);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column;gap:14px}
+.bill .line{display:flex;justify-content:space-between;font-size:15px;color:var(--fg-2)}
+.bill .total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:14px}
+.bill .total b{font-family:var(--display);font-size:34px}
+.bill .btn{width:100%}
+.note{font-size:13px;color:var(--muted);margin:0}
+.more h2{font-family:var(--display);font-size:26px;letter-spacing:-.01em;margin:0 0 4px}
+.more .head p{margin:0;color:var(--fg-2)}
+.addons{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.addon{border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--surface);display:flex;flex-direction:column;transition:box-shadow .2s,border-color .2s}
+.addon.on{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.addon .art{position:relative;aspect-ratio:16/10;overflow:hidden;background:#2b3f22}
+.addon .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.addon .body h3{font-size:17px;font-weight:700;color:var(--fg);margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.addon .body h3 small{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.addon .body p{font-size:13px;color:var(--fg-2);margin:0;line-height:1.45}
+.addon .body .why{font-size:12px;color:var(--muted)}
+.addon .opts{margin-top:auto;padding-top:6px;border-top:1px solid var(--line)}
+.addon label{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--fg);cursor:pointer;padding:7px 0 0}
+.addon label small{font-weight:600;color:var(--fg-2);margin-left:auto}
+.addon label input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.addon .fields{display:none;flex-direction:column;gap:8px;padding-top:10px}
+.addon.on .fields{display:flex}
+.addon .fields label{font-size:12px;font-weight:600;color:var(--muted);padding:0;flex-direction:column;align-items:stretch;gap:4px}
+.addon .fields input[type=text],.addon .fields input[type=password],.addon .fields textarea{width:100%;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.addon .fields textarea{min-height:64px;resize:vertical}
+.addon .capsrc{display:flex;flex-direction:column;gap:6px}
+.addon .fields .capsrc label{flex-direction:row;align-items:flex-start;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--fg)}
+.addon .fields .capsrc label:has(input:checked){border-color:var(--accent,#2F7A56);background:var(--bg)}
+.addon .capsrc input{margin-top:3px}
+.addon .capsrc span{display:flex;flex-direction:column;gap:2px}
+.addon .capsrc small,.addon .fields .opt{font-weight:400;color:var(--muted)}
+.addon .fields .terms{flex-direction:row;align-items:flex-start;font-size:12px;font-weight:500;color:var(--fg-2);line-height:1.4}
+.addon .fields .terms input{margin-top:2px}
+.addon .body .warn{font-size:12px;color:var(--warn);font-weight:600}
+.quick label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--fg);cursor:pointer;padding:6px 0}
+.quick label input{width:16px;height:16px;accent-color:var(--accent);flex:none}
+.quick label small{margin-left:auto;font-weight:600;color:var(--fg-2)}
+/* map art */
+.art.map{background:radial-gradient(ellipse at 30% 40%,#4f6b3a,#36502a 55%,#2b3f22)}
+.art .rd{position:absolute;height:5px;background:#e8d36a;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.art .lot{position:absolute;left:46%;top:40%;width:10%;height:16%;background:rgba(240,70,70,.75);outline:2px solid #ff3b3b;transform:skewX(-6deg)}
+.art .tag{position:absolute;left:52%;top:30%;font:700 8px/1 system-ui;letter-spacing:.06em;color:#fff;background:#e23b3b;padding:3px 5px;border-radius:3px}
+.art .card{position:absolute;background:#fff;border-radius:3px;padding:3px;display:grid;grid-template-columns:1fr 1fr;gap:2px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.art .card i{display:block;height:7px;border-radius:2px}
+.art .lbl{position:absolute;font:700 7px/1 system-ui;color:#000;background:#fff;padding:2px 4px;border-radius:2px;letter-spacing:.04em}
+/* captions art */
+.art.cap{background:#1b1f1c;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+.art.cap .ph{background:#fff;border-radius:6px;padding:5px;display:flex;flex-direction:column;gap:4px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.art.cap .ph i{display:block;aspect-ratio:3/2;border-radius:3px;background:linear-gradient(135deg,#6b8f5a,#3f6136)}
+.art.cap .ph i.b{background:linear-gradient(135deg,#c9b89a,#8f7d5f)}
+.art.cap .ph i.c{background:linear-gradient(135deg,#8fb6d6,#4a7aa3)}
+.art.cap .ph i.d{background:linear-gradient(135deg,#d9d2c5,#a89f90)}
+.art.cap .ph s{display:block;height:4px;border-radius:2px;background:#cfd3cf;text-decoration:none}
+.art.cap .ph s.w{width:70%}.art.cap .ph s.n{width:50%}
+.art.cap .pill{position:absolute;right:10px;bottom:10px;font:700 8px/1 system-ui;letter-spacing:.06em;color:#fff;background:var(--accent);padding:5px 8px;border-radius:999px}
+/* spotlight art */
+.art.spot{background:linear-gradient(160deg,#efe8da,#d7cdb8);display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:12px 12px 0}
+.art.spot .pg{background:#fff;border-radius:4px 4px 0 0;box-shadow:0 -4px 14px rgba(0,0,0,.18);padding:8px;display:flex;flex-direction:column;gap:4px}
+.art.spot .pg.a{width:38%;height:88%;transform:rotate(-3deg);transform-origin:bottom}
+.art.spot .pg.b{width:44%;height:100%;z-index:1}
+.art.spot .pg.c{width:38%;height:88%;transform:rotate(3deg);transform-origin:bottom}
+.art.spot .pg b{display:block;height:6px;width:60%;border-radius:2px;background:#1e2a22}
+.art.spot .pg i{display:block;aspect-ratio:16/10;border-radius:3px;background:linear-gradient(135deg,#7fa56f,#3e5e3a)}
+.art.spot .pg i.w{background:linear-gradient(135deg,#9ec5e0,#5b8fb0)}
+.art.spot .pg s{display:block;height:3px;border-radius:2px;background:#d8d4cb;text-decoration:none}
+.art.spot .pg s.n{width:70%}
+.pinwrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.ref{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);padding:14px 14px 12px;box-shadow:0 24px 48px -28px rgba(30,42,34,.3)}
+.ref b{display:block;font-size:15px;margin-bottom:4px}.ref p{margin:0 0 10px;font-size:13px;line-height:1.45;color:var(--muted,#55615a)}
+.ref img{display:block;width:100%;border-radius:12px;cursor:zoom-in}.ref small{display:block;margin-top:8px;font-size:12px;color:var(--muted,#55615a)}
+@media (max-width:900px){.pinwrap{grid-template-columns:1fr}}
+.stage{position:relative;border-radius:var(--r-xl);overflow:hidden;background:#111;height:min(66vh,760px);min-height:320px;box-shadow:0 24px 48px -28px rgba(30,42,34,.5)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+.stage .cap{position:absolute;right:16px;top:14px;padding:8px 12px;border-radius:10px;background:#fff;font-size:13px;font-weight:600}
+.stage .zoom{position:absolute;left:14px;top:14px;display:flex;gap:4px;background:#fff;border-radius:10px;padding:4px}
+.stage .zoom button{border:0;background:none;min-width:34px;height:32px;border-radius:7px;font-weight:700;cursor:pointer}
+.stage .zoom button:hover{background:var(--surface)}
+.stage .zoom .z{min-width:44px;display:grid;place-items:center;font-size:12px;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);text-align:center;margin:0}
+.hint b{color:var(--fg-2);font-weight:600}
+
+/* step 5 look */
+.look{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+@media (max-width:900px){.look{grid-template-columns:minmax(0,1fr)}}
+.big{position:relative;border-radius:var(--r-xl);overflow:hidden;background:#111;aspect-ratio:16/10}
+.big canvas{width:100%;height:100%;object-fit:contain;display:block}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px}
+.strip .th{flex:0 0 110px;aspect-ratio:3/2;animation:none;cursor:pointer;outline:3px solid transparent;outline-offset:-3px}
+.strip .th.active{outline-color:var(--accent)}
+.sheet{background:var(--surface);border-radius:var(--r-lg);padding:20px;display:flex;flex-direction:column;gap:14px}
+.sheet h3{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.sw button{padding:0;aspect-ratio:1;border-radius:8px;border:2px solid transparent;cursor:pointer}
+.sw button.on{border-color:var(--fg)}
+.pick{display:flex;align-items:center;gap:8px}
+.pick input[type=color]{width:40px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
+.pick input[type=text]{width:96px;min-height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--line);font-size:13px}
+.rg{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;font-size:14px}
+.rg .v{font-size:13px;color:var(--muted);min-width:44px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#fff;border-radius:10px;padding:4px}
+.seg button{border:0;background:none;padding:9px 8px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button small{display:block;font-weight:500;font-size:11px;opacity:.8}
+
+/* step 6 pay */
+.pay{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+@media (max-width:900px){.pay{grid-template-columns:minmax(0,1fr)}}
+.bill{background:var(--surface);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column;gap:14px}
+.bill .line{display:flex;justify-content:space-between;font-size:15px;color:var(--fg-2)}
+.bill .total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:14px}
+.bill .total b{font-family:var(--display);font-size:34px}
+.bill .btn{width:100%}
+.note{font-size:13px;color:var(--muted);margin:0}
+.ok{color:var(--ok);font-weight:600}
+/* step 3: adjust modes + terms (big, plain) */
+#hint3{font-size:15px;color:var(--fg-2)} #hint3 b{color:var(--fg);font-weight:700}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 16px}
+.modes-q{grid-column:1/-1;margin:0;font-family:var(--display);font-size:20px;font-weight:700;color:var(--fg)}
+.mode{display:flex;gap:14px;align-items:flex-start;text-align:left;padding:18px 20px;border-radius:var(--r-lg);border:2px solid var(--line);background:#fff;color:var(--fg);cursor:pointer;font:inherit;transition:border-color .15s,background .15s,box-shadow .15s}
+.mode:hover{border-color:#9DBBA9}
+.mode svg{flex:none;color:var(--muted);margin-top:2px}
+.mode b{display:block;font-size:18px;line-height:1.25}
+.mode em{display:block;font-style:normal;font-size:15px;color:var(--muted);margin:2px 0 8px}
+.mode ul{margin:0;padding-left:18px;font-size:15px;line-height:1.55;color:var(--fg-2)}
+.mode strong{color:var(--fg)}
+.mode.on{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(47,122,86,.15)}
+.mode.on svg{color:var(--accent)}
+@media (max-width:760px){.modes{grid-template-columns:1fr}}
+#acts3,#acts5{max-width:720px}
+.agree{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;margin:12px 0 4px;cursor:pointer}.agree input{width:20px;height:20px;accent-color:var(--accent)}
+.disclaim{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.45}
+.payterms{font-size:12.5px;color:var(--muted);line-height:1.45;margin:6px 0 0}
+.linkbtn{background:none;border:0;padding:6px 0;color:var(--muted);text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}
+.cancelled{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}
+.capokbtn{margin-top:8px}.capdone{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;color:var(--accent);font-weight:700;font-size:14px;margin-top:8px}.capdone small{color:var(--muted);font-weight:500;flex-basis:100%}.capdone .linkbtn{font-size:13px;padding:0}
+.pinterms{width:100%;box-sizing:border-box;text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 20px;display:grid;gap:8px}
+.pinterms-h{margin:0 0 2px!important;font-size:17px!important;font-weight:700;color:var(--fg)!important}
+.pinterms-row{font-size:16px;color:var(--fg-2);line-height:1.45}
+.pinterms-row span{font-weight:700;margin-right:4px}.pinterms-row .ok{color:var(--accent)}.pinterms-row .warn{color:#A0522D}
+/* add-on toggles: big and easy to hit */
+.quick{display:grid;gap:8px}
+.quick label{gap:12px;font-size:17px;font-weight:700;padding:14px 16px;border:2px solid var(--line);border-radius:var(--r);background:#fff;transition:border-color .15s,background .15s}
+.quick label:has(input:checked){border-color:var(--accent);background:var(--surface)}
+.quick label input,.addon label input{width:24px;height:24px}
+.quick label small,.addon label small{font-size:17px;font-weight:700;color:var(--fg)}
+#quickNote{font-size:14px}
+.addon .body h3{font-size:20px} .addon .body h3 small{font-size:12px}
+.addon .body p{font-size:15px} .addon .body .why{font-size:14px}
+.addon label{font-size:16px;font-weight:700;padding:12px 0 4px;gap:12px}
+.addon .fields label{font-size:14px} .addon .fields .terms{font-size:14px}
+.addon .fields input[type=text],.addon .fields input[type=password],.addon .fields textarea{font-size:16px;padding:10px 12px}
+/* kit cards with real examples */
+.kit-ex{margin:0 0 12px;font-size:15px;color:var(--fg-2)}
+.kit{grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.kit .it{padding:12px 12px 18px;gap:6px}
+.kit .it b{font-size:18px;padding:6px 6px 0} .kit .it span{font-size:15px;padding:0 6px;line-height:1.45}
+.kit .shots{display:grid;gap:6px}.kit .shots.two{grid-template-columns:1fr 1fr}
+.kit .shot{display:block;padding:0;border:0;background:#dfe5df;border-radius:12px;overflow:hidden;cursor:zoom-in;aspect-ratio:3/2}
+.kit .shots.two .shot{aspect-ratio:3/4}
+.kit .shot img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .3s var(--ease)}
+.kit .shot:hover img{transform:scale(1.03)}
+.kitlb{position:fixed;inset:0;z-index:60;background:rgba(14,20,16,.88);display:grid;place-items:center;padding:24px;cursor:zoom-out}
+.kitlb[hidden]{display:none}.kitlb img{max-width:min(1200px,100%);max-height:88vh;border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.kitlb p{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-weight:600;margin:0}
+.mlssteps{margin:4px 0 6px;padding-left:22px;font-size:15px;line-height:1.5;color:var(--fg-2);display:grid;gap:6px}.mlssteps b{color:var(--fg)}
+.dlbox{display:grid;gap:8px}.dlprog,.mlsstat{margin:0;font-size:14px;color:var(--fg-2)}
+.mlsbox{margin-top:14px;padding:16px;border:2px solid var(--line);border-radius:var(--r-lg);background:#fff;display:grid;gap:10px}
+.mlsbox>b{font-size:17px}.mlsbox ol{margin:0;padding-left:20px;font-size:15px;line-height:1.5;color:var(--fg-2);display:grid;gap:4px}
+.mlsget{margin:0;font-size:14px;color:#A0522D;font-weight:600}.mlsstat{font-weight:600;color:var(--accent)}
+.capbar{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;margin:0 0 16px;border-radius:var(--r-lg);background:var(--surface);border:2px solid var(--line)}
+.capbar b{font-size:18px}.capbar p{margin:4px 0 0;font-size:15px;color:var(--fg-2);max-width:640px}.capbar .caperr{color:#A0522D;font-weight:600}
+.capacts{display:flex;gap:8px;flex-wrap:wrap}.capprog{flex:1 1 200px;height:10px;border-radius:99px;background:#fff;overflow:hidden}.capprog i{display:block;height:100%;background:var(--accent);transition:width .4s}
+#grid6.capgrid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.capcard{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;display:flex;flex-direction:column}
+.capcard .th{border-radius:0;cursor:zoom-in}.capbody{padding:12px;display:grid;gap:8px}
+.captext{width:100%;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.5;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--fg);resize:vertical}
+.captext[readonly]{background:#fff;border-color:transparent;padding:4px 2px;resize:none}
+.capcount{font-size:12px;color:var(--muted)}.capwait{margin:0;font-weight:600;color:var(--accent)}
+.capask{width:100%;box-sizing:border-box;font:inherit;font-size:15px;border:2px dashed #C9D6CC;border-radius:10px;padding:10px;background:var(--bg)}
+.capask:focus{border-style:solid;border-color:var(--accent);outline:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="index.html" aria-label="Lot Outline home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13V17a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h7" fill="#F7C948" fill-opacity=".3" stroke="#2F7A56" stroke-width="2.5" stroke-linecap="round"/><path d="M19 1.6c-2.1 0-3.6 1.6-3.6 3.5 0 2.7 3.6 5.6 3.6 5.6s3.6-2.9 3.6-5.6c0-1.9-1.5-3.5-3.6-3.5z" fill="#2F7A56"/><circle cx="19" cy="5.1" r="1.3" fill="#fff"/></svg>
+    <b>Lot Outline</b>
+  </a>
+  <div class="meta"><span class="pill" id="pill"></span><span class="saved" id="saved" hidden></span><a id="who" class="who" href="account.html" title="Your account and orders"></a><button type="button" class="btn link" onclick="LO.signOut()">Sign out</button></div>
+</header>
+
+<div class="prog" aria-label="Order progress">
+  <div class="labels" id="labels"><span>Address</span><span>Photos</span><span>Confirm pins</span><span>Carrying</span><span>Look</span><span>Pay</span></div>
+  <div class="bar"><i id="bar"></i></div>
+</div>
+
+<main>
+  <!-- 1 ADDRESS -->
+  <section class="screen" id="s1">
+    <div class="col">
+      <div class="head"><div><h1>Where's the listing?</h1><p>We pull the parcel from the county so the shape and footage are the real ones.</p></div></div>
+      <div class="ac">
+        <label class="lbl" for="addr">Property address</label>
+        <input class="field" id="addr" placeholder="Start typing the address, or paste the HAR link" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div class="sugg" id="sugg" hidden></div>
+      </div>
+      <p class="resume" id="resumeLine" hidden></p>
+      <div class="parcel" id="parcel" aria-live="polite">
+        <div class="map"><svg width="40" height="30" viewBox="0 0 40 30" aria-hidden="true"><polygon id="pshape" points="8,6 32,6 32,24 8,24" fill="#F7C948" fill-opacity=".5" stroke="#2F7A56" stroke-width="2" stroke-linejoin="round"/><g id="pinner" fill="none" stroke="#2F7A56" stroke-width=".8" stroke-dasharray="1.6 1.4" opacity=".7"></g></svg></div>
+        <div class="pbody"><b id="pname">Parcel found</b><span id="pdesc"></span>
+          <div class="think" id="think" hidden><i></i><i></i><i></i><span id="thinkT">Looking up the county records…</span></div>
+          <div class="pids" id="pids"></div>
+        </div>
+      </div>
+      <div class="findp" id="findP" hidden>
+        <p class="perr" id="findErr"></p>
+        <div class="findrow">
+          <div class="cty"><label class="lbl" for="ctyIn">County</label><input class="field" id="ctyIn" placeholder="Start typing the county" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="ctySugg"><div class="sugg" id="ctySugg" role="listbox" hidden></div></div>
+          <div><label class="lbl" for="findKind">Look up by</label><select class="field" id="findKind"><option value="tax">Tax ID</option><option value="parcel">Parcel ID</option></select></div>
+        </div>
+        <div class="addp"><input class="field" id="findIn" inputmode="numeric" placeholder="Pick the county first" autocomplete="off" disabled><button type="button" class="btn primary" id="findGo">Find parcel</button></div>
+        <p class="addpmsg" id="findMsg" hidden></p>
+        <button type="button" class="linkbtn" id="findClosest" hidden></button>
+      </div>
+      <div class="morep" id="moreP" hidden>
+        <button type="button" class="addbtn" id="addPOpen"><i>+</i><span>Add another parcel</span></button>
+        <div class="addp" id="addP" hidden><select class="field" id="addPKind" aria-label="Look up by"><option value="addr" selected>Address</option><option value="tax">Tax ID</option><option value="parcel">Parcel ID</option></select><div class="addpin"><input class="field" id="addPIn" inputmode="text" placeholder="Start typing the address of the next parcel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="addPSugg"><div class="sugg" id="addPSugg" role="listbox" hidden></div></div><button type="button" class="btn" id="addPGo">Add parcel · $2</button></div>
+        <p class="pfee addfee" id="addFee" hidden>This parcel adds $2 to the order.</p>
+        <button type="button" class="linkbtn" id="findOpen">Wrong parcel? Look it up by tax ID or parcel ID</button>
+        <p class="pfee" id="pFee">Each parcel after the first adds $2 to the order. Add as many as you need, then pick how you want to continue below.</p>
+        <button type="button" class="btn primary" id="donePBtn" hidden>Done adding parcels</button>
+        <p class="addpmsg" id="addPMsg" hidden></p>
+      </div>
+      <div class="paths" id="paths">
+        <button type="button" class="path main" id="go1" disabled><b>I have the photos</b><span>Drone or HAR shots, five to forty. We outline every one.</span></button>
+        <button type="button" class="path" id="go1sat" disabled><b>Upgrade my listing</b><span>No photos needed. Aerial close-ups, the plat map, what's nearby and which way the lot faces, all from the address.</span></button>
+      </div>
+      <p class="try">No shoot handy? Try an example: <button type="button" data-ex="maroneal">Maroneal, a house lot</button> · <button type="button" data-ex="lakeside">65 Lakeside, a vacant canal lot</button></p>
+    </div>
+  </section>
+
+  <!-- 7 SATELLITE KIT (no-photos path) -->
+  <section class="screen" id="s7">
+    <div class="head"><div><h1>Upgrade the listing from the address.</h1><p>Aerial close-ups with the lot outlined, the plat map from the county record, the shopping and schools within a mile, and which way the lot faces. Keep your photos. This adds what they can't show from the front yard.</p></div><button class="btn" id="back7">Change address</button></div>
+    <div class="lcheck" id="lcheck">
+      <b>Free listing check</b><span>Paste your HAR link and we'll tell you what the listing is missing.</span>
+      <div class="harrow"><input class="field" id="harLink7" type="url" placeholder="https://www.har.com/homedetail/..." aria-label="HAR listing link"><button type="button" class="btn" id="harGo7">Check my listing</button></div>
+      <ul id="lcOut" hidden></ul>
+    </div>
+    <p class="kit-ex">Real examples from 3710 Maroneal St. Click any one to see it full size.</p>
+    <div class="kit">
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/close-lg.jpg" aria-label="Enlarge: Close-up overhead"><img src="kit/close.jpg" alt="Satellite close-up of the lot, outlined in red with a yellow highlight" loading="lazy" width="720" height="480"></button></div><b>Close-up overhead</b><span>Straight down on the lot, outlined and highlighted, plus the same shot with no lines.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/block-lg.jpg" aria-label="Enlarge: The block"><img src="kit/block.jpg" alt="Satellite view of the block with the lot outlined" loading="lazy" width="720" height="480"></button></div><b>The block</b><span>Pulled back so buyers see the street, the neighbors and the lot in context.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/area-lg.jpg" aria-label="Enlarge: The neighborhood"><img src="kit/area.jpg" alt="Satellite view of the neighborhood with the lot marked" loading="lazy" width="720" height="480"></button></div><b>The neighborhood</b><span>The widest view: parks, water, main roads, with the lot still marked.</span></div>
+      <div class="it"><div class="shots two"><button type="button" class="shot" data-full="kit/mapblock-lg.jpg" aria-label="Enlarge: Street-map versions"><img src="kit/mapblock.jpg" alt="Street maps of the block and the neighborhood with the lot outlined" loading="lazy" width="720" height="480"></button><button type="button" class="shot" data-full="kit/maparea-lg.jpg" aria-label="Enlarge: Street-map versions"><img src="kit/maparea.jpg" alt="Street maps of the block and the neighborhood with the lot outlined" loading="lazy" width="720" height="480"></button></div><b>Street-map versions</b><span>The block and the neighborhood on a clean street map, roads named. For the buyers who don't read satellite.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/region-lg.jpg" aria-label="Enlarge: Where it sits"><img src="kit/region.jpg" alt="City map with the property marked as a labeled dot" loading="lazy" width="720" height="480"></button></div><b>Where it sits</b><span>A 2-mile street map with the property marked and a close-up of the lot, so buyers see where it sits.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/parcel-lg.jpg" aria-label="Enlarge: Parcel map"><img src="kit/parcel.jpg" alt="County parcel map with lot dimensions in feet" loading="lazy" width="720" height="480"></button></div><b>Plat map</b><span>The county's lot lines with footage on every side, the lot size and the legal description.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/nearby-lg.jpg" aria-label="Enlarge: What's nearby"><img src="kit/nearby.jpg" alt="Map of shopping centers, groceries, schools and parks within a mile of the lot" loading="lazy" width="720" height="480"></button></div><b>What's nearby</b><span>Shopping centers, groceries, schools and parks within a mile, by name. No logos or links.</span></div>
+      <div class="it"><div class="shots"><button type="button" class="shot" data-full="kit/sun-lg.jpg" aria-label="Enlarge: Orientation and sun"><img src="kit/sun.jpg" alt="Compass sheet showing which way the lot faces and the summer and winter sun path" loading="lazy" width="720" height="480"></button></div><b>Orientation and sun</b><span>Which way the front and back face, read from the county map, and where the sun rises and sets in summer and winter.</span></div>
+    </div>
+    <div class="kitline"><span>Listing upgrade · 11 MLS-ready images, outlined and reviewed</span><b id="kitprice"></b></div>
+    <div class="acts">
+      <button class="btn primary lg" id="go7">Build my upgrade</button>
+      <div class="busy" id="busy7" hidden><i></i><span id="busy7t">Working…</span></div>
+      <div class="errbox" id="err7" hidden></div>
+      <p class="fine">Nothing is charged until you confirm the lot on the close-up. Every image is made to go on the MLS: the lot is the subject of each one, with no logos, links or contact info. The files are numbered in the order to upload them. Satellite imagery is usually one to three years old, so glance at the close-up against the lot as it is today. Any outline style, same as a photo order.</p>
+    </div>
+  </section>
+
+  <!-- 2 PHOTOS -->
+  <section class="screen" id="s2">
+    <div class="head"><div><h1>Drop the photos.</h1><p>The whole shoot, five to forty. The photographer's originals give the cleanest result. Using photos from HAR? Paste a clickable link to your listing below.</p></div><button class="btn" id="back2">Change address</button></div>
+    <div class="intake">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add photos">
+        <span class="dropic" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span>
+        <b>Drop the drone photos here</b><span class="dropsub">or <u>click to choose them</u> · 5 to 40 photos, JPG or PNG</span>
+      </div>
+      <div class="orsep" aria-hidden="true"><span>or</span></div>
+      <div class="harcard">
+        <b>Photos already on HAR?</b>
+        <span>Paste the listing link and we'll pull every photo in MLS order.</span>
+        <div class="harrow"><input class="field" id="harLink" type="url" placeholder="https://www.har.com/homedetail/..." aria-label="HAR listing link"><button type="button" class="btn primary" id="harGo">Pull photos from HAR</button></div>
+        <p class="hint" id="harMsg" hidden></p>
+      </div>
+    </div>
+    <input type="file" id="file" accept="image/*" multiple hidden>
+    <div class="grid" id="grid2"></div>
+    <div class="count"><span id="cnt">No photos yet</span><b id="price"></b></div>
+    <div class="acts"><button class="btn primary lg" id="go2" disabled>Continue to confirm pins</button><p>Minimum 5 photos. Nothing is charged until you confirm the pins.</p></div>
+  </section>
+
+  <!-- 3 CONFIRM PINS -->
+  <section class="screen" id="s3">
+    <div class="head"><div><h1 id="h3">Are the pins on the fence?</h1><p id="p3">We put the county parcel on photo 1. We're usually right, but we want to be sure: if our automated map disagrees with the boundary line, drag a pin. We then recreate the same markers on every other angle you uploaded.</p></div><button class="btn" id="reset">Start over from the county lines</button></div>
+    <p class="placing" id="placing" hidden><span class="think" id="placingDot"><i></i><i></i><i></i></span><span id="placingT"></span></p>
+    <p class="res" id="res3"><span class="tag">Working view</span><span id="res3t"></span></p>
+    <div class="modes" role="radiogroup" aria-label="How do you want to adjust the outline?">
+      <p class="modes-q">How do you want to adjust it?</p>
+      <button type="button" class="mode" id="modeLock" role="radio" aria-checked="false">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>
+        <span><b>Move the whole outline</b><em>Best for most lots. The county's exact shape stays the same.</em>
+        <ul><li><strong>Drag inside the lot</strong> to slide it into place</li><li><strong>Drag a corner</strong> to turn it or make it bigger or smaller</li></ul></span>
+      </button>
+      <button type="button" class="mode on" id="modeFree" role="radio" aria-checked="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19l3-12 10 2 1 8z"/><circle cx="5" cy="19" r="2"/><circle cx="8" cy="7" r="2"/><circle cx="18" cy="9" r="2"/><circle cx="19" cy="17" r="2"/></svg>
+        <span><b>Move one corner at a time</b><em>For a lot that doesn't match the county's shape.</em>
+        <ul><li><strong>Drag any pin</strong> by itself</li><li><strong>Double-click a line</strong> to add a corner</li><li><strong>Right-click a pin</strong> to remove it</li></ul></span>
+      </button>
+    </div>
+    <div class="pinwrap">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="zoom"><button id="zOut" aria-label="Zoom out">−</button><span class="z" id="zVal">fit</span><button id="zIn" aria-label="Zoom in">+</button><button id="zFit">Fit</button></div>
+      <span class="cap" id="cap">Photo 1</span>
+    </div>
+    <aside class="ref" id="ref3" hidden>
+      <b>Parcel check</b>
+      <p>The county's lot lines on satellite, sides in feet. Your pins carry the same numbers: put pin 1 where corner 1 is on your photo, and so on. If our guess and your eye disagree, the parcel is usually the one to trust unless you have the survey.</p>
+      <img id="ref3img" alt="County parcel drawn over satellite imagery with side lengths">
+      <small id="ref3t"></small>
+    </aside>
+    </div>
+    <div class="pintools" role="group" aria-label="Pins">
+      <button type="button" class="ptool" id="pClear">Clear shape</button>
+      <button type="button" class="ptool" id="pAdd"><i>+</i> Add pin</button>
+      <button type="button" class="ptool" id="pDel"><i>−</i> Remove pin</button>
+      <span class="pcount" id="pCount"></span>
+    </div>
+    <p class="hint" id="hint3">Use the <b>+</b> and <b>−</b> buttons or your scroll wheel to zoom in on a corner.</p>
+    <div class="acts" id="acts3">
+      <div class="pinterms">
+        <p class="pinterms-h">Where you put these pins is the lot line on every photo.</p>
+        <div class="pinterms-row"><span class="ok">Our mistake?</span> If we place an outline wrong, we redo it <b>free</b>.</div>
+        <div class="pinterms-row"><span class="warn">Pins in the wrong spot?</span> A rerun is charged like a <b>new order</b>, so please double-check that every corner is placed correctly before clicking <b>Use these pins</b>.</div>
+      </div>
+      <button class="btn primary lg" id="go3">Use these pins for all photos</button>
+    </div>
+    <div class="acts" id="acts3fix" hidden><button class="btn primary lg" id="go3fix">Save this photo</button></div>
+  </section>
+
+  <!-- 4 CARRYING -->
+  <section class="screen" id="s4">
+    <div class="head"><div><h1>Carrying the outline to every angle.</h1><p>Each photo starts from where the drone's camera was when it was taken. Anything we can't confirm is flagged for you, never passed off as placed.</p></div></div>
+    <div class="grid" id="grid4"></div>
+    <div class="acts"><p id="p4">Placing…</p><button class="btn primary lg" id="go4" hidden>Choose the look</button></div>
+  </section>
+
+  <!-- 5 LOOK -->
+  <section class="screen" id="s5">
+    <div class="head"><div><h1>Pick the look.</h1><p>One style for the whole order. Try as many looks as you like; changes are free until you create the order.</p></div><button class="btn" id="back5">Change the boundary pins</button></div>
+    <div class="look">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div class="big"><canvas id="big"></canvas></div>
+        <div class="strip" id="strip"></div>
+      </div>
+      <aside class="sheet">
+        <h3>Outline</h3>
+        <div class="sw" id="swLine"></div>
+        <div class="pick"><input type="color" id="lineColor" value="#eb1e1e"><input type="text" id="lineHex" value="#eb1e1e" aria-label="Outline hex"></div>
+        <div class="rg"><label for="lineW">Thickness</label><span class="v" id="lineWv">0.70%</span></div><input type="range" id="lineW" min="0.05" max="3" step="0.01" value="0.70">
+        <div class="rg"><label for="lineA">Opacity</label><span class="v" id="lineAv">100%</span></div><input type="range" id="lineA" min="0" max="100" step="1" value="100">
+        <div class="seg seg4" id="dash" role="radiogroup" aria-label="Line style"><button type="button" class="on" data-m="solid"><svg width="44" height="8" viewBox="0 0 44 8" aria-hidden="true"><line x1="3" y1="4" x2="41" y2="4" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="none"/></svg><small>Solid</small></button><button type="button" data-m="dash"><svg width="44" height="8" viewBox="0 0 44 8" aria-hidden="true"><line x1="3" y1="4" x2="41" y2="4" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-dasharray="9 5"/></svg><small>Dashed</small></button><button type="button" data-m="dashdot"><svg width="44" height="8" viewBox="0 0 44 8" aria-hidden="true"><line x1="3" y1="4" x2="41" y2="4" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-dasharray="9 4 3 4"/></svg><small>Dash dot</small></button><button type="button" data-m="dot"><svg width="44" height="8" viewBox="0 0 44 8" aria-hidden="true"><line x1="3" y1="4" x2="41" y2="4" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 6"/></svg><small>Dotted</small></button></div>
+        <div id="innerBox" hidden>
+          <h3 style="margin-top:6px">Lines between parcels</h3>
+          <div class="seg" id="innerOn"><button type="button" class="on" data-m="on">Show<small>dashed lines between parcels</small></button><button type="button" data-m="off">Hide<small>one outline, nothing inside</small></button></div>
+          <div id="innerColorBox" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+            <label class="innerchk"><input type="checkbox" id="innerMatch" checked> Same color as the outline</label>
+            <div id="innerPick" hidden><div class="sw" id="swInner"></div><div class="pick" style="margin-top:10px"><input type="color" id="innerColor" value="#eb1e1e"><input type="text" id="innerHex" value="#eb1e1e" aria-label="Parcel line hex"></div></div>
+          </div>
+        </div>
+        <h3 style="margin-top:6px">Lot highlight</h3>
+        <div class="sw" id="swFill"></div>
+        <div class="pick"><input type="color" id="fillColor" value="#F7C948"><input type="text" id="fillHex" value="#F7C948" aria-label="Highlight hex"></div>
+        <div class="rg"><label for="fillA">Opacity</label><span class="v" id="fillAv">35%</span></div><input type="range" id="fillA" min="0" max="100" step="1" value="35">
+        <div class="seg" id="cover"><button type="button" class="on" data-m="ground">Ground only<small>house and trees stand above</small></button><button type="button" data-m="all">Cover everything<small>flat shade over the lot</small></button></div>
+        <div class="seg" id="blend"><button type="button" class="on" data-m="overlay">See-through<small>grass shows</small></button><button type="button" data-m="source-over">Solid<small>covers grass</small></button><button type="button" data-m="hatch">Hatch<small>stripes, your color</small></button></div>
+        <div id="hatchBox" hidden><div class="rg"><label for="hatchGap">Stripe spacing</label><span class="v" id="hatchGapv">Medium</span></div><input type="range" id="hatchGap" min="0.8" max="4" step="0.1" value="1.8"></div>
+        <h3 style="margin-top:6px">Add to this order</h3>
+        <div class="quick" id="quick5"></div>
+        <p class="fine" id="quickNote">Captions run 300 to 500 characters for every photo, with a round of revisions included. One price for the whole order, not per photo.</p>
+      </aside>
+    </div>
+    <div class="acts" id="acts5">
+      <div class="pinterms">
+        <p class="pinterms-h">Check the look before you create the order.</p>
+        <div class="pinterms-row"><span class="warn">After you click Create</span> each change to the line, the highlight or the pins is <b>$2</b>. Our own mistakes are always fixed free.</div>
+        <label class="agree"><input type="checkbox" id="agree5"> I understand and agree</label>
+        <p class="disclaim">Outlines come from county parcel maps and are checked photo by photo. They're accurate to the best of our knowledge, but parcel maps and photos aren't surveys and no system is perfect. Check the lot lines before you list; you use them at your own risk.</p>
+      </div>
+      <button class="btn primary lg" id="go5" disabled>Create my order</button>
+    </div>
+  </section>
+
+  <!-- 6 PAY -->
+  <section class="screen" id="s6">
+    <div class="head"><div><h1>Ready when you are.</h1><p id="p6">Previews are watermarked. Click any photo to enlarge. Full-resolution files unlock when you finalize.</p></div><button class="btn" id="back6">Adjust style</button></div>
+    <div class="pay">
+      <div>
+        <div class="capbar" id="capBar" hidden></div>
+        <div class="grid" id="grid6"></div>
+        <section class="more">
+          <div class="head" style="margin:28px 0 14px"><div><h2>Want even more?</h2><p>A few things we can add to this order. Each one comes from the same address and photos you already gave us.</p></div></div>
+          <div class="addons" id="addons"></div>
+        </section>
+      </div>
+      <aside class="bill">
+        <div class="line"><span id="bl1">12 photos, outlined and reviewed</span><span id="bl2"></span></div>
+        <div class="line" id="blParcels" hidden><span id="blParcelsL"></span><span id="blParcelsV"></span></div>
+        <div class="line" id="blFee" hidden><span id="blFeeL">Changes after creating</span><span id="blFeeV"></span></div>
+        <div id="blAddons"></div>
+        <div class="total"><span>Total</span><b id="total">$25</b></div>
+        <button class="btn primary lg" id="pay">Pay with card</button>
+        <p class="payterms" id="payterms">You'll see every photo before anything is final. Not happy? Cancel before you finalize and you get a full refund.</p>
+        <div class="dlbox" id="finBox" hidden>
+          <button class="btn primary lg" id="payFee" hidden>Pay the change fee</button>
+          <button class="btn primary lg" id="fin">Finalize order</button>
+          <p class="payterms" id="finNote"></p>
+          <button class="linkbtn" id="cancelOrder">Cancel and get a full refund</button>
+        </div>
+        <div class="dlbox" id="dlAll" hidden>
+          <button class="btn primary lg" id="dlZip">Download all as one ZIP</button>
+          <button class="btn lg" id="dlEach">Download each photo separately</button>
+          <p class="dlprog" id="dlProg" hidden></p>
+        </div>
+        <div class="apptkit" id="apptKit" hidden>
+          <b>Listing appointment coming up?</b>
+          <p>Type the seller's address before you go and walk in with the aerial, the plat map and what's nearby already done. We're building the listing appointment kit now.</p>
+          <button class="btn" id="apptGo">Tell me when it's ready</button>
+        </div>
+        <div class="mlsbox" id="mlsBox" hidden>
+          <b>Put them on your MLS listing</b>
+          <ol><li>Sign in to HAR Matrix in this Chrome, like you normally would.</li><li>Click <b>Approve upload</b>. Matrix opens in a new tab and the Lot Outline helper adds the photos<span id="mlsCapNote"> and captions</span> to your listing.</li><li>Look them over, then click <b>Certify and Save</b> in Matrix.</li></ol>
+          <button class="btn primary lg" id="mlsGo">Approve upload</button>
+          <p class="mlsget" id="mlsGet" hidden>The Lot Outline helper isn't in this Chrome yet. <a href="helper.html" target="_blank" rel="noopener">Add it (one time, about a minute)</a>, then come back and click Approve upload.</p>
+          <p class="mlsstat" id="mlsStat" hidden></p>
+        </div>
+        <p class="note" id="paynote">Card checkout opens at launch. For this preview build, "Pay" unlocks the downloads so you can see the full-res output.</p>
+      </aside>
+    </div>
+  </section>
+</main>
+</div>
+
+<div class="reopen" id="reopen" hidden role="status"><span id="reopenT">Opening your order…</span></div>
+<div class="kitlb" id="kitlb" hidden role="dialog" aria-label="Example image"><img id="kitlbImg" alt=""><p id="kitlbT"></p></div>
+<div class="lb" id="lb" hidden role="dialog" aria-label="Preview">
+  <button class="x" id="lbX" aria-label="Close">×</button>
+  <canvas id="lbC"></canvas>
+  <div class="bar"><button id="lbPrev" aria-label="Previous">‹</button><span id="lbCap"></span><button id="lbNext" aria-label="Next">›</button></div>
+</div>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const TIERS = [[5,15],[10,20],[15,25],[20,30],[30,40],[40,50]];
+const priceFor = n => { const t = TIERS.find(([k]) => n <= k); return t ? t[1] : null; };
+const fmt = n => n == null ? '' : '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- order state ----------
+const order = { addr:'', parcel:null, parcelList:[], photos:[], harLink:'', step:1, paid:false, fixing:-1, mode:'photos', addons:{ maps:[], enhance:false, captions:false, capSrc:'address', keyItems:'', mlsUpload:false, mlsAuth:false, spot:false }, density:'urban' };
+const st = { lineColor:'#eb1e1e', lineW:0.70, innerOn:true, innerMatch:true, innerColor:'#eb1e1e', lineA:1, fillColor:'#F7C948', fillA:0.35, fillMode:'overlay', cover:'ground', dash:'solid', hatchGap:1.8 };
+
+// ---------- steps ----------
+// Two intakes share the stepper: photos (6 steps) and the satellite kit (5 steps, carrying is exact so it is skipped).
+const FLOWS = { photos: { names:['Address','Photos','Confirm pins','Carrying','Look','Pay'], steps:[1,2,3,4,5,6] },
+                satellite: { names:['Address','Imagery','Confirm lot','Look','Pay'], steps:[1,7,3,5,6] } };
+const isSat = () => order.mode === 'satellite';
+// Every add-on is a flat $5 per order (decision 10/12/2026); each area-map radius counts as its own add-on.
+LO.ADDON_MAP = LO.ADDON_MAP ?? 5;          // per area map
+LO.ADDON_ENHANCE = LO.ADDON_ENHANCE ?? 5;  // flat: code-based photo enhancement on every photo (same rules as the Lot Photo Editor)
+LO.ADDON_CAPTION = LO.ADDON_CAPTION ?? 5;          // MLS photo descriptions (up to 500 characters each): satellite kit or up to 10 photos
+LO.ADDON_CAPTION_BIG = LO.ADDON_CAPTION_BIG ?? 7.5; // 11 to 40 photos
+const captionPrice = () => isSat() || order.photos.length <= 10 ? LO.ADDON_CAPTION : LO.ADDON_CAPTION_BIG;
+LO.ADDON_MLS_UPLOAD = LO.ADDON_MLS_UPLOAD ?? 5;   // flat: the agent signs in to their MLS in their own Chrome and approves; we upload in that session (no login collected)
+LO.ADDON_SPOT = LO.ADDON_SPOT ?? 5;        // flat: Neighborhood Spotlight booklet
+LO.SHOW_SPOT = LO.SHOW_SPOT ?? false;
+LO.SHOW_MAPS = LO.SHOW_MAPS ?? false;      // Area maps are off for now (decision 10/12/2026); flip to true to offer them again      // Spotlight is off until it's further developed (decision 10/12/2026); flip to true to offer it again
+// Which radii to offer depends on how much is around the lot. Ladder is 1 / 3 / 5 / 10 miles; we offer three steps.
+// Dense city (lots of businesses within a mile): 1, 3, 5. Suburb / mid-size town: 3, 5, 10. Small town or rural: 5, 10, and the largest only if it adds anything.
+// order.density is a placeholder until the pipeline counts businesses around the parcel: 'urban' | 'suburban' | 'rural'.
+const RADII = { urban:[1,3,5], suburban:[3,5,10], rural:[5,10] };
+const radiiFor = () => RADII[order.density || 'urban'];
+const basePrice = () => isSat() ? LO.sat.PRICE : priceFor(order.photos.length);
+// Enhancement and captions are priced per photo; both together take the bundle rate.
+// Enhancement is only for the agent's own photos; a satellite/map kit (our imagery) never offers it.
+const perPhotoAddons = () => { const A = order.addons; if (isSat()) A.enhance = false; return (A.enhance ? LO.ADDON_ENHANCE : 0) + (A.captions ? captionPrice() : 0); };
+LO.ADDON_PARCEL = LO.ADDON_PARCEL ?? 2;   // each parcel past the first (decision 10/12/2026)
+const extraParcels = () => Math.max(0, (order.parcelList || []).length - 1);
+const orderPrice = () => extraParcels() * LO.ADDON_PARCEL + (order.changes || 0) * (LO.CHANGE_FEE ?? 2) + basePrice() + order.addons.maps.length * LO.ADDON_MAP + perPhotoAddons() + (order.addons.mlsUpload ? LO.ADDON_MLS_UPLOAD : 0) + (order.addons.spot ? LO.ADDON_SPOT : 0);
+function setFlow(mode){ order.mode = mode; const f = FLOWS[mode]; $('labels').innerHTML = f.names.map(n => `<span>${n}</span>`).join(''); 
+  // Satellite kit: always "Cover everything" and the choice isn't shown.
+  const sat = mode === 'satellite'; st.cover = sat ? 'all' : 'ground'; $('cover').hidden = sat; [...$('cover').children].forEach(x => x.classList.toggle('on', x.dataset.m === st.cover)); }
+async function showRef(){ const a = $('ref3'); if (!order.geoRing || !LO.sat || !LO.sat.parcelCheck) { a.hidden = true; return; }
+  const rk = JSON.stringify(order.geoRing); if (order.refRing !== rk) { a.hidden = true; const r = await ensureRef(); if (!r || order.refRing !== rk) return; }
+  if (!order.ref) return; $('ref3img').src = order.ref.img.src; $('ref3t').textContent = 'Sides: ' + order.ref.sides.map(v => Math.round(v) + ' ft').join(' / ') + ' · ' + Math.round(order.ref.area).toLocaleString() + ' sq ft'; a.hidden = false; setTimeout(resize, 0); }
+$('ref3img') && ($('ref3img').onclick = () => { const w = window.open(); if (w) { w.document.write('<title>Parcel check</title><img src="' + $('ref3img').src + '" style="max-width:100%">'); } });
+async function goBackTo(n){ if (order.step === 1 && n > 1 && !(await finishParcels())) return;
+  if (n >= 3 && !isSat()) { seedFromParcel(); if (n === 3) setTimeout(autoPlace, 50); }
+  if (n === 3) { order.fixing = -1; cur = order.pinIdx || 0; $('acts3').hidden = false; $('acts3fix').hidden = true; }
+  if (n === 2 && isSat()) n = 7; go(n); if (n === 5) buildLook(); if (n === 6) buildPay(); }
+function go(n){ order.step = n; if (n === 3) showRef(); const f = FLOWS[order.mode]; const at = f.steps.indexOf(n);
+  for (const i of [1,2,3,4,5,6,7]) $('s'+i).classList.toggle('on', i === n);
+  // Finished steps are links back (photos and pins stay put). After payment the address and photos are locked to the order.
+  order.reached = Math.max(order.reached || 0, at);
+  [...$('labels').children].forEach((el, i) => { const tgt = f.steps[i], ok = i !== at && i <= order.reached && !(order.paid && tgt <= 2) && !(tgt === 6 && !order.created) && !(tgt === 4 && isSat());
+    el.className = (i < at ? 'done' : i === at ? 'now' : '') + (ok ? ' nav' : ''); el.onclick = ok ? () => goBackTo(tgt) : null; el.onkeydown = ok ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goBackTo(tgt); } } : null;
+    if (ok) { el.setAttribute('role', 'link'); el.tabIndex = 0; el.title = `Back to ${el.textContent}`; } else { el.removeAttribute('role'); el.removeAttribute('tabindex'); el.removeAttribute('title'); } });
+  $('bar').style.width = (at / (f.steps.length - 1) * 100 + 8) + '%';
+  updPill();
+  window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+  if (n === 3) { cv.hidden = false; resize(); fitView(); }
+  if (n === 5) { buildLook(); buildQuick(); }
+  if (n === 6) buildPay();
+  thumbDirty = true; saveNow();
+}
+function updPill(){ const k = order.photos.length, p = orderPrice();
+  $('pill').textContent = [order.addr && order.addr.split(',')[0], isSat() ? (k ? 'listing upgrade' : '') : (k ? `${k} photo${k>1?'s':''}` : ''), p && (k || isSat()) ? fmt(p) : ''].filter(Boolean).join(' · '); }
+
+// ---------- 1. address ----------
+// Suggestions come from places.js: Google Places with a key, otherwise Harris County parcel records (and Photon/OSM elsewhere).
+const sugg = $('sugg'); let sel = -1, hits = [], suggTimer = null;
+function showSugg(){ clearTimeout(suggTimer); suggTimer = setTimeout(async () => {
+  const res = await LO.places.suggest($('addr').value); if (res === null) return;  // superseded by a newer keystroke
+  hits = res; sel = -1; sugg.innerHTML = '';
+  hits.forEach((h, i) => { const d = document.createElement('div'); d.innerHTML = `<b>${h.main}</b>${h.secondary ? `<span style="color:var(--muted)"> · ${h.secondary}</span>` : ''}`;
+    d.onmouseenter = () => mark(i); d.onmousedown = e => { e.preventDefault(); choose(i); }; sugg.appendChild(d); });
+  sugg.hidden = hits.length === 0 || document.activeElement !== $('addr'); }, 60); }
+function mark(i){ sel = i; [...sugg.children].forEach((c, j) => c.classList.toggle('mark', j === i)); }
+async function choose(i){ const h = hits[i]; if (!h) return; sugg.hidden = true; $('addr').value = h.text;
+  const r = await LO.places.resolve(h.id, h.text, h); order.geo = r.lat != null ? { lat: r.lat, lng: r.lng } : null; order.geoRing = r.ring || null; pick(r.address, r.parcel); }
+function pick(a, parcel){ $('addr').value = a; order.addr = a; sugg.hidden = true;
+  const isLake = /lakeside/i.test(a), isMar = /maroneal/i.test(a); if (!parcel) order.geoRing = null;
+  order.parcel = parcel || (isLake ? { cad:'Galveston CAD', dims:'canal-front lot', pts:'6,8 34,8 36,22 6,22' } : isMar ? { cad:'Harris CAD', dims:'60 × 132 ft', pts:'12,4 28,4 28,26 12,26' } : { cad:'County parcel', dims:'matched by location when the order runs', pts:'8,6 32,6 32,24 8,24', pending: true });
+  $('pname').textContent = order.parcel.pending ? 'Address set' : 'Parcel found'; $('pdesc').textContent = `${order.parcel.cad} · ${order.parcel.dims}`; $('pshape').setAttribute('points', order.parcel.pts);
+  $('parcel').classList.add('in'); $('paths').classList.add('in'); $('go1').disabled = false; $('go1sat').disabled = false; 
+  order.pinIdx = 0; order.pinIdxSet = false; order.parcelList = []; order.groups = []; order.parcelsDone = false; order.swapFirst = false; $('addPGo').textContent = 'Add parcel · $' + LO.ADDON_PARCEL; $('addP').hidden = true; $('addPOpen').hidden = false; $('addPMsg').hidden = true; $('moreP').hidden = true; hideFind(); $('pids').innerHTML = ''; $('pinner').innerHTML = '';
+  if ((order.parcel.pending || order.parcel.hcad) && LO.sat && LO.sat.findParcel) lookupParcel(a); saveNow(); }
+// Typed or picked address: ask the county (Harris, Galveston, Fort Bend, Montgomery, San Jacinto) for the parcel right away,
+// showing the work while it runs, then the tax ID from the county record.
+function thinking(lines){ $('think').hidden = false; let k = 0; const t0 = Date.now(); $('thinkT').textContent = lines[0]; const t = setInterval(() => { k = Math.min(k + 1, lines.length - 1); $('thinkT').textContent = lines[k]; }, 950);
+  return () => new Promise(res => setTimeout(() => { clearInterval(t); $('think').hidden = true; res(); }, Math.max(0, 1600 - (Date.now() - t0)))); }
+async function lookupParcel(a){ $('pname').textContent = 'Finding the parcel'; $('pdesc').textContent = ''; $('pids').innerHTML = ''; hideFind();
+  const stop = thinking(['Placing the address on the map…', 'Looking up the county tax records…', 'Matching the parcel to the address…', 'Reading the lot lines…']);
+  const street = a.split(',')[0].trim(), how = 'Pick the county and enter the tax ID or parcel ID from the tax statement or the county appraisal district website, and we\'ll find it in the tax records.';
+  try { const r = await LO.sat.findParcel(order); if (order.addr !== a) return; await stop();
+    // The county's own address for the parcel must start with the typed house number; otherwise it's a different property.
+    const want = (a.match(/^\s*(\d+)/) || [])[1], got = r ? (r.rec.situs.match(/^\s*(\d+)/) || [])[1] : null;
+    if (r && (!want || got === want)) { order.parcelList = [r.rec]; order.parcelsDone = false; await showParcels(); $('moreP').hidden = false; return; }
+    notFound(r ? `<b>${esc(street)} isn't in the ${esc(r.rec.cad.replace(' CAD', ' County'))} tax records under that address.</b> Some properties are recorded under a different address. ${how}`
+               : `<b>We couldn't find ${esc(street)} in the county tax records.</b> ${how}`, r ? r.rec.key : LO.sat.guessCounty(a, order.geo), r && r.rec); }
+  catch (e) { console.warn('parcel lookup', e); await stop(); if (order.addr === a) notFound(`<b>We couldn't find ${esc(street)} in the county tax records.</b> ${how}`, LO.sat.guessCounty(a, order.geo), null); } }
+
+// ---- county + tax ID / parcel ID lookup, for addresses the tax records don't use ----
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const keyName = k => Object.keys(LO.sat.COUNTY_KEYS).find(n => LO.sat.COUNTY_KEYS[n] === k);
+function hideFind(){ $('findP').hidden = true; $('findMsg').hidden = true; $('findClosest').hidden = true; $('ctySugg').hidden = true; }
+function notFound(html, key, closest){ $('pname').textContent = 'Not in the tax records under this address'; $('pdesc').textContent = ''; $('pids').innerHTML = ''; $('pinner').innerHTML = '';
+  order.parcelList = []; order.groups = []; order.geoRing = null; $('moreP').hidden = true; openFind(html, key);
+  $('findClosest').hidden = !closest; if (closest) { $('findClosest').textContent = `Or use the closest county parcel: ${closest.situs || 'no street address'} (tax ID ${fid(closest.key, 'tax', closest.id)})`; $('findClosest').onclick = () => useParcel(closest); } }
+function openFind(html, key){ $('findErr').innerHTML = html || ''; $('findP').hidden = false; $('findMsg').hidden = true; setCounty(key ? keyName(key) : null); if (!key) $('ctyIn').focus(); else $('findIn').focus(); }
+function setCounty(name){ const key = name ? LO.sat.COUNTY_KEYS[name] : null; order.findKey = key || null; $('ctyIn').value = name ? name + ' County' : ''; $('ctySugg').hidden = true;
+  const inp = $('findIn'); inp.disabled = !key; inp.value = key ? LO.sat.formatId(key, $('findKind').value, inp.value) : ''; $('findGo').disabled = !key;
+  inp.placeholder = !name ? 'Pick the county first' : key ? `${$('findKind').value === 'tax' ? 'Tax ID' : 'Parcel ID'}: ${LO.sat.idMask(key, $('findKind').value)}` : 'Not available for this county yet';
+  if (name && !key) findMsg(`We can't search the ${name} County tax records yet. You can keep going and place the corners yourself on the next step.`); else $('findMsg').hidden = true; }
+const findMsg = (t, ok) => { $('findMsg').hidden = !t; $('findMsg').textContent = t || ''; $('findMsg').classList.toggle('ok', !!ok); };
+let ctyHits = [], ctySel = -1;
+function ctyList(){ const q = $('ctyIn').value.trim().toLowerCase().replace(/\s*county$/, ''); const L = LO.sat.TX_COUNTIES, K = LO.sat.COUNTY_KEYS;
+  ctyHits = (q ? [...L.filter(n => n.toLowerCase().startsWith(q)), ...L.filter(n => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q))] : Object.keys(K)).slice(0, 8); ctySel = -1;
+  $('ctySugg').innerHTML = ctyHits.map((n, i) => `<div role="option" data-i="${i}"${K[n] ? '' : ' class="off"'}><b>${esc(n)} County</b>${K[n] ? '' : '<small>not available yet</small>'}</div>`).join('');
+  [...$('ctySugg').children].forEach(d => d.onmousedown = e => { e.preventDefault(); setCounty(ctyHits[+d.dataset.i]); if (order.findKey) $('findIn').focus(); });
+  $('ctySugg').hidden = !ctyHits.length; }
+$('ctyIn').oninput = () => { order.findKey = null; $('findIn').disabled = true; $('findGo').disabled = true; ctyList(); };
+$('ctyIn').onfocus = ctyList; $('ctyIn').onblur = () => setTimeout(() => { $('ctySugg').hidden = true; if (!order.findKey) { const q = $('ctyIn').value.trim().toLowerCase().replace(/\s*county$/, ''); const m = LO.sat.TX_COUNTIES.find(n => n.toLowerCase() === q); if (m) setCounty(m); } }, 120);
+$('ctyIn').onkeydown = e => { const n = ctyHits.length; if (!n) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ctySel = (ctySel + (e.key === 'ArrowDown' ? 1 : -1) + n) % n; [...$('ctySugg').children].forEach((c, j) => c.classList.toggle('mark', j === ctySel)); }
+  else if (e.key === 'Enter') { e.preventDefault(); setCounty(ctyHits[Math.max(0, ctySel)]); if (order.findKey) $('findIn').focus(); } };
+$('findKind').onchange = () => { const k = order.findKey; if (k) setCounty(keyName(k)); $('findIn').focus(); };
+$('findIn').oninput = () => { const k = order.findKey; if (!k) return; const inp = $('findIn'), atEnd = inp.selectionStart === inp.value.length, v = LO.sat.formatId(k, $('findKind').value, inp.value); if (v !== inp.value) { inp.value = v; if (atEnd) inp.setSelectionRange(v.length, v.length); } };
+$('findIn').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('findGo').click(); } };
+$('findGo').onclick = async () => { const key = order.findKey, raw = $('findIn').value.trim(), kind = $('findKind').value, label = kind === 'tax' ? 'tax ID' : 'parcel ID', name = keyName(key);
+  if (!key) return findMsg('Pick the county first.'); if (!raw) return findMsg(`Enter the ${label}.`);
+  $('findGo').disabled = true; findMsg(''); const stop = thinking([`Looking up ${label} ${raw} in the ${name} County tax records…`, 'Reading the lot lines…']);
+  try { const rec = await LO.sat.parcelById(key, raw); await stop();
+    if (!rec) return findMsg(`We couldn't find ${label} ${raw} in the ${name} County tax records. Check the number; it should look like ${LO.sat.idMask(key, kind)}.`);
+    await useParcel(rec); }
+  catch (e) { console.warn('find parcel', e); await stop(); findMsg(`Something went wrong reaching the ${name} County records. Try again in a moment.`); }
+  finally { $('findGo').disabled = !order.findKey; } };
+async function useParcel(rec){ const R = rec.ring, n = R.length; order.geo = { lat: R.reduce((t, p) => t + p.lat, 0) / n, lng: R.reduce((t, p) => t + p.lng, 0) / n };
+  order.parcelList = [rec]; order.groups = []; order.parcelsDone = false; order.swapFirst = false; hideFind(); await showParcels(); $('moreP').hidden = false;
+  addMsg(`Found tax ID ${fid(rec.key, 'tax', rec.id)} in the ${rec.cad.replace(' CAD', ' County')} tax records${rec.situs ? `, listed there as ${rec.situs}` : ''}.`, true); }
+$('findOpen').onclick = () => { const f = order.parcelList[0]; openFind('', f ? f.key : null); $('findP').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+
+// ---- several adjoining parcels, one outline ----
+const PC_URL = 'https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js';
+const loadPC = () => window.polygonClipping ? Promise.resolve(window.polygonClipping) : new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = PC_URL; sc.onload = () => res(window.polygonClipping); sc.onerror = () => rej(new Error('outline tool did not load')); document.head.appendChild(sc); });
+// A flat feet frame around a set of rings (fine at lot scale).
+function feetFrame(rings){ const all = rings.flat(), lat0 = all.reduce((t, p) => t + p.lat, 0) / all.length, lng0 = all.reduce((t, p) => t + p.lng, 0) / all.length, kx = 364000 * Math.cos(lat0 * Math.PI / 180), ky = 364000;
+  return { to: p => ({ x: (p.lng - lng0) * kx, y: (p.lat - lat0) * ky }), from: q => ({ lng: lng0 + q.x / kx, lat: lat0 + q.y / ky }) }; }
+const segDist = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy; const t = L ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L)) : 0; const q = { x: a.x + t * dx, y: a.y + t * dy }; return { d: Math.hypot(p.x - q.x, p.y - q.y), q }; };
+const ringGap = (A, B) => { let m = Infinity; for (const p of A) for (let i = 0; i < B.length; i++) m = Math.min(m, segDist(p, B[i], B[(i + 1) % B.length]).d); for (const p of B) for (let i = 0; i < A.length; i++) m = Math.min(m, segDist(p, A[i], A[(i + 1) % A.length]).d); return m; };
+// County lines between neighbors rarely match to the inch: snap each corner within 1.5 ft onto the other parcel, union, keep the outer ring, tidy it.
+async function unionRing(list){ if (list.length === 1) return list[0].ring;
+  const F = feetFrame(list.map(x => x.ring)); const R = list.map(x => x.ring.map(F.to));
+  for (let i = 1; i < R.length; i++) R[i] = R[i].map(p => { let best = null;
+    for (let j = 0; j < i; j++) { for (const v of R[j]) { const d = Math.hypot(v.x - p.x, v.y - p.y); if (d < 1.5 && (!best || d < best.d)) best = { d, q: v }; }
+      if (!best) for (let k = 0; k < R[j].length; k++) { const s2 = segDist(p, R[j][k], R[j][(k + 1) % R[j].length]); if (s2.d < 1.5 && (!best || s2.d < best.d)) best = s2; } }
+    return best ? { x: best.q.x, y: best.q.y } : p; });
+  const pc = await loadPC(); const polys = R.map(r => [[...r.map(p => [p.x, p.y]), [r[0].x, r[0].y]]]);
+  const U = pc.union(...polys); const area = ring => Math.abs(ring.reduce((t, p, i) => { const q = ring[(i + 1) % ring.length]; return t + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+  let outer = U.map(poly => poly[0]).sort((a, b) => area(b) - area(a))[0].map(([x, y]) => ({ x, y })); outer.pop();
+  // drop near-duplicate points, slivers that fold back on themselves, and corners on a straight side
+  const turn = (a, b, c) => { const t1 = Math.atan2(b.y - a.y, b.x - a.x), t2 = Math.atan2(c.y - b.y, c.x - b.x); let d = Math.abs(t2 - t1) * 180 / Math.PI; return d > 180 ? 360 - d : d; };
+  let changed = true; while (changed && outer.length > 3) { changed = false; for (let i = 0; i < outer.length; i++) { const a = outer[(i - 1 + outer.length) % outer.length], b = outer[i], c = outer[(i + 1) % outer.length];
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 0.4 || turn(a, b, c) < 4 || turn(a, b, c) > 172) { outer.splice(i, 1); changed = true; break; } } }
+  return outer.map(F.from); }
+const NEAR_FT = 300;   // separate pieces this close (edge to edge) stay on one order and get their own outlines
+async function showParcels(){ const L = order.parcelList, n = L.length; if (!n) return;
+  const done = n === 1 || order.parcelsDone;
+  if (n === 1) order.groups = [{ ring: L[0].ring, members: [0] }];
+  const outer = done ? order.groups.map(g => g.ring) : L.map(x => x.ring), primary = outer[0]; order.geoRing = done ? order.groups[0].ring : L[0].ring;
+  const all = outer.flat(), xs = all.map(p => p.lng), ys = all.map(p => p.lat), k = Math.cos(ys[0] * Math.PI / 180), w = (Math.max(...xs) - Math.min(...xs)) * k || 1e-9, h = (Math.max(...ys) - Math.min(...ys)) || 1e-9, sc = Math.min(32 / w, 22 / h);
+  const icon = r => r.map(p => `${(4 + ((p.lng - Math.min(...xs)) * k) * sc + (32 - w * sc) / 2).toFixed(1)},${(4 + (Math.max(...ys) - p.lat) * sc + (22 - h * sc) / 2).toFixed(1)}`).join(' ');
+  const pts = icon(primary); $('pshape').setAttribute('points', pts);
+  $('pinner').innerHTML = (done ? order.groups.slice(1).map(g => `<polygon points="${icon(g.ring)}" fill="#F7C948" fill-opacity=".5" stroke-dasharray="none" stroke-width="2" opacity="1"/>`).join('') : '')
+    + (n > 1 ? L.map((x, i) => done || i ? `<polygon points="${icon(x.ring)}"${done ? '' : ' fill="#F7C948" fill-opacity=".35"'}/>` : '').join('') : '');
+  const tot = L.reduce((t, x) => t + x.area, 0), G = done ? order.groups.length : 0;
+  order.parcel = { cad: L[0].cad, dims: n > 1 ? `${n} parcels · ${(tot / 43560).toFixed(3)} ac combined` : L[0].dims, hcad: L[0].id, pts };
+  $('pname').textContent = n === 1 ? 'Parcel found' : !done ? `${n} parcels added` : G === 1 ? `${n} adjoining parcels, one outline` : `${n} parcels, ${G} outlines`;
+  $('pdesc').textContent = L[0].cad + (n === 1 && L[0].legal ? ' · ' + L[0].legal : '');
+  const size = x => `${Math.round(x.area).toLocaleString()} sq ft<small>${(x.area / 43560).toFixed(3)} acres</small>`;
+  $('pids').innerHTML = L.map((x, i) => `<div class="prow">${n > 1 ? `<span class="pnum">Parcel ${i + 1}${x.situs ? ' · ' + esc(x.situs) : ''}${i ? ' · +$' + LO.ADDON_PARCEL : ''}</span>` : ''}`
+      + `<dl><dt>Tax ID</dt><dd>${esc(fid(x.key, 'tax', x.id))}</dd></dl><dl><dt>Parcel ID</dt><dd>${esc(x.pid ? fid(x.key, 'parcel', x.pid) : fid(x.key, 'tax', x.id))}</dd></dl><dl><dt>Lot size</dt><dd>${size(x)}</dd></dl>`
+      + (i ? `<button type="button" class="prm" data-rm="${i}" aria-label="Remove parcel ${esc(x.id)}" title="Remove">×</button>` : '<span></span>') + `</div>`).join('')
+    + (n > 1 ? `<div class="ptot">Combined: <b>${Math.round(tot).toLocaleString()} sq ft · ${(tot / 43560).toFixed(3)} ac</b> · ${n - 1} extra parcel${n > 2 ? 's' : ''}, <b>+$${(n - 1) * LO.ADDON_PARCEL}</b></div>` : '');
+  [...$('pids').querySelectorAll('[data-rm]')].forEach(b => b.onclick = async () => { order.parcelList.splice(+b.dataset.rm, 1); order.parcelsDone = false; $('addPMsg').hidden = true; await showParcels(); });
+  $('addPOpen').querySelector('span').textContent = n > 1 ? 'Add another parcel' : 'Selling more than one parcel? Add another';
+  $('addPOpen').hidden = !$('addP').hidden; $('addFee').hidden = $('addP').hidden || !!order.swapFirst; $('addFee').textContent = `This parcel adds $${LO.ADDON_PARCEL} to the order.`; $('pFee').textContent = `Each parcel after the first adds $${LO.ADDON_PARCEL} to the order. Add as many as you need, then pick how you want to continue below.`;
+  $('donePBtn').hidden = true;   // Next (either path button) finishes the parcels
+  updPill(); }
+// Done adding: group parcels that touch (each group gets one outline), keep separate groups that sit near the main one,
+// and take off anything too far to share this order's photos.
+async function finishParcels(){ const L = order.parcelList; if (L.length < 2 || order.parcelsDone) return true;
+  const stop = thinking(['Laying the parcels out on the county map…', 'Checking which ones touch…', 'Drawing the outlines…']);
+  try { const F = feetFrame(L.map(x => x.ring)), R = L.map(x => x.ring.map(F.to)), n = L.length;
+    const par = [...Array(n).keys()], find = i => par[i] === i ? i : (par[i] = find(par[i]));
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (ringGap(R[i], R[j]) <= 4) par[find(i)] = find(j);
+    const byRoot = new Map(); for (let i = 0; i < n; i++) { const r = find(i); if (!byRoot.has(r)) byRoot.set(r, []); byRoot.get(r).push(i); }
+    let groups = [...byRoot.values()].sort((a, b) => a.includes(0) ? -1 : b.includes(0) ? 1 : a[0] - b[0]);
+    const gGap = (A, B) => Math.min(...A.flatMap(i => B.map(j => ringGap(R[i], R[j]))));
+    // a separate piece stays if it's within NEAR_FT of the main group or of another piece that stays
+    const keep = [groups[0]], rest = groups.slice(1); let grew = true;
+    while (grew) { grew = false; for (let k = rest.length - 1; k >= 0; k--) if (keep.some(g => gGap(g, rest[k]) <= NEAR_FT)) { keep.push(rest.splice(k, 1)[0]); grew = true; } }
+    const far = rest.flat().map(i => ({ rec: L[i], ft: Math.round(Math.min(...keep.map(g => gGap(g, [i])))) }));
+    const kept = keep.flat().sort((a, b) => a - b), remap = new Map(kept.map((i, k) => [i, k]));
+    order.parcelList = kept.map(i => L[i]);
+    order.groups = []; for (const g of keep) { const members = g.map(i => remap.get(i)); order.groups.push({ members, ring: await unionRing(members.map(m => order.parcelList[m])) }); }
+    order.parcelsDone = true; await stop(); await showParcels();
+    const touching = order.groups.filter(g => g.members.length > 1).length, apart = order.groups.length - 1;
+    let msg = order.groups.length === 1 ? `All ${order.parcelList.length} parcels touch, so they share one outline with light dashed lines between them.`
+      : `${order.groups.length} separate pieces close together, each with its own outline${touching ? '; parcels that touch share one' : ''}.`;
+    if (far.length) msg += ' ' + far.map(f => `Tax ID ${f.rec.id}${f.rec.situs ? ' (' + f.rec.situs + ')' : ''} is about ${f.ft.toLocaleString()} ft away, too far out of range to add to this order, so we took it off. You can start a separate order for it.`).join(' ');
+    addMsg(msg, !far.length); if (far.length) $('addPMsg').insertAdjacentHTML('beforeend', ' <a href="app.html" target="_blank" rel="noopener">Start a separate order</a>');
+    return true; }
+  catch (e) { console.warn('finish parcels', e); await stop(); addMsg('Something went wrong lining up the parcels. Try Done again.'); return false; } }
+// Tax ID / parcel ID box: dashes go in as the agent types, in the county's own format.
+const fid = (key, kind, v) => { const t = LO.sat.formatId(key, kind, v); return t && t.replace(/\D/g, '') === String(v).replace(/\D/g, '') ? t : String(v); };
+function setAddKind(kind){ const first = order.parcelList[0], key = first && first.key; $('addPKind').value = kind; const inp = $('addPIn');
+  inp.inputMode = kind === 'addr' ? 'text' : 'numeric'; inp.value = kind === 'addr' ? '' : key ? LO.sat.formatId(key, kind, inp.value) : inp.value;
+  const ex = first ? (kind === 'parcel' && first.pid ? fid(key, 'parcel', first.pid) : fid(key, 'tax', first.id)) : '';
+  inp.placeholder = kind === 'addr' ? 'Start typing the address of the next parcel' : ex ? `Like ${ex}` : LO.sat.idMask(key, kind); }
+$('addPKind').onchange = () => { setAddKind($('addPKind').value); $('addPIn').focus(); };
+$('addPIn').oninput = () => { const k = $('addPKind').value, first = order.parcelList[0]; if (k === 'addr' || !first) return; const inp = $('addPIn'), atEnd = inp.selectionStart === inp.value.length;
+  const v = LO.sat.formatId(first.key, k, inp.value); if (v !== inp.value) { inp.value = v; if (atEnd) inp.setSelectionRange(v.length, v.length); } };
+const addMsg = (t, ok) => { $('addPMsg').hidden = !t; $('addPMsg').textContent = t || ''; $('addPMsg').classList.toggle('ok', !!ok); };
+$('donePBtn').onclick = () => finishParcels();
+$('addPOpen').onclick = () => { $('addP').hidden = false; $('addPOpen').hidden = true; $('addFee').hidden = false; setAddKind($('addPKind').value || 'addr'); $('addPIn').focus(); };
+// Address mode: the same suggestions as the main address box drop down as the agent types.
+const aSugg = $('addPSugg'); let aSel = -1, aHits = [], aTimer = null;
+function aHide(){ aSugg.hidden = true; aSel = -1; }
+function aMark(i){ aSel = i; [...aSugg.children].forEach((c, j) => c.classList.toggle('mark', j === i)); }
+function aChoose(i){ const h = aHits[i]; if (!h) return; $('addPIn').value = h.text; aHide(); $('addPIn').focus(); }
+function aShow(){ clearTimeout(aTimer); if ($('addPKind').value !== 'addr') return aHide();
+  aTimer = setTimeout(async () => { const res = await LO.places.suggest($('addPIn').value); if (res === null) return;
+    aHits = res; aSel = -1; aSugg.innerHTML = '';
+    aHits.forEach((h, i) => { const d = document.createElement('div'); d.setAttribute('role', 'option'); d.innerHTML = `<b>${h.main}</b>${h.secondary ? `<span style="color:var(--muted)"> · ${h.secondary}</span>` : ''}`;
+      d.onmouseenter = () => aMark(i); d.onmousedown = e => { e.preventDefault(); aChoose(i); }; aSugg.appendChild(d); });
+    aSugg.hidden = !aHits.length || $('addPKind').value !== 'addr' || document.activeElement !== $('addPIn'); }, 60); }
+$('addPIn').addEventListener('input', aShow); $('addPIn').addEventListener('focus', aShow); $('addPIn').addEventListener('blur', aHide);
+$('addPKind').addEventListener('change', aHide);
+$('addPIn').onkeydown = e => { const open = !aSugg.hidden && aSugg.children.length, n = aSugg.children.length;
+  if (open && e.key === 'ArrowDown') { e.preventDefault(); aMark((aSel + 1) % n); return; }
+  if (open && e.key === 'ArrowUp') { e.preventDefault(); aMark((aSel - 1 + n) % n); return; }
+  if (open && e.key === 'Escape') { aHide(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); if (open && aSel >= 0) return aChoose(aSel); aHide(); $('addPGo').click(); } };
+$('addPGo').onclick = async () => { const raw = $('addPIn').value.trim(), L = order.parcelList; if (!raw || !L.length) return; addMsg('');
+  const first = L[0], isAddr = $('addPKind').value === 'addr' || /[a-z]{3,}/i.test(raw), swap = !!order.swapFirst; $('addPGo').disabled = true;
+  const stop = thinking(isAddr ? ['Placing that address…', 'Looking up the county tax records…', 'Checking it touches your parcel…'] : [`Looking up ${$('addPKind').value === 'parcel' ? 'parcel' : 'tax'} ID ${raw} in the ${first.cad} records…`, 'Reading the lot lines…', 'Checking it touches your parcel…']);
+  try { const rec = isAddr ? await LO.sat.parcelAtAddress(raw) : await LO.sat.parcelById(first.key, raw); await stop();
+    if (!rec) return addMsg(isAddr ? "We couldn't match a county parcel to that address. Try its tax ID instead." : `We couldn't find ${$('addPKind').value === 'parcel' ? 'parcel' : 'tax'} ID ${raw} in the ${first.cad} records. It should look like ${LO.sat.idMask(first.key, $('addPKind').value)}.`);
+    if (rec.key !== first.key) return addMsg(`That parcel is in ${rec.cad.replace(' CAD', ' County')}, and this order is in ${first.cad.replace(' CAD', ' County')}. Start a separate order for it.`);
+    if (swap) { order.parcelList = [rec]; order.parcelsDone = false; order.swapFirst = false; $('addPGo').textContent = 'Add parcel · $' + LO.ADDON_PARCEL; $('addP').hidden = true; await showParcels(); $('addPIn').value = ''; return addMsg(`Using tax ID ${rec.id}${rec.situs ? ' (' + rec.situs + ')' : ''}.`, true); }
+    if (L.some(x => x.id === rec.id)) return addMsg(`Tax ID ${rec.id} is already on this order.`);
+    L.push(rec); order.parcelsDone = false; await showParcels(); $('addPIn').value = ''; $('addPIn').focus();
+    addMsg(`Added tax ID ${rec.id}${rec.situs ? ' (' + rec.situs + ')' : ''}. Add another, or pick how you want to continue below.`, true); }
+  catch (e) { console.warn('add parcel', e); await stop(); addMsg('Something went wrong reaching the county. Try again in a moment.'); }
+  finally { $('addPGo').disabled = false; } };
+$('addr').oninput = () => { if (HAR_URL.test($('addr').value.trim())) { harStart($('addr').value.trim()); return; } showSugg(); if ($('addr').value.trim().length < 6) { $('parcel').classList.remove('in'); $('paths').classList.remove('in'); $('go1').disabled = true; $('go1sat').disabled = true; order.parcel = null; } };
+$('addr').onchange = () => { const v = $('addr').value.trim(); if (v.length >= 6 && (!order.parcel || v !== order.addr)) pick(v); };
+$('addr').onfocus = showSugg; $('addr').onblur = () => { sugg.hidden = true; };
+$('addr').onkeydown = e => { if (sugg.hidden) return; const n = sugg.children.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); mark((sel + 1) % n); } else if (e.key === 'ArrowUp') { e.preventDefault(); mark((sel - 1 + n) % n); }
+  else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); choose(sel); } else if (e.key === 'Escape') sugg.hidden = true; };
+$('go1').onclick = async () => { if (!(await finishParcels())) return; if (isSat()) { order.photos = []; setFlow('photos'); } go(2); };
+$('go1sat').onclick = async () => { if (!(await finishParcels())) return; if (!isSat()) { order.photos = []; setFlow('satellite'); } $('kitprice').textContent = fmt(LO.sat.PRICE); $('err7').hidden = true; showCheck(); go(7); };
+
+// ---------- HAR link -> address + free listing check (the way in for agents upgrading a live listing) ----------
+const HAR_URL = /^https?:\/\/(www\.|www-v2\.)?har\.com\//i;
+async function harRead(url){ const r = await fetch(HAR_FN, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) }); const d = await r.json();
+  if (!r.ok || d.error) throw new Error(d.error || 'HAR did not answer.'); order.harLink = url; order.har = { harid: d.harid, mlsid: d.mlsid, address: d.address };
+  order.harCheck = LO.sat.listingCheck(d, /\blots?\b|acre|land|vacant/i.test(d.address || '') || d.photos.length <= 3); if ($('harLink')) $('harLink').value = url; showCheck(); return d; }
+function showCheck(){ const o = $('lcOut'); if (!o || !order.harCheck) return; o.innerHTML = order.harCheck.map(f => `<li class="${f.bad ? '' : 'ok'}">${esc(f.t)}</li>`).join(''); o.hidden = false; if (order.harLink) $('harLink7').value = order.harLink; }
+async function harStart(url){ const a = $('addr'); a.disabled = true; const was = a.value; a.value = 'Reading the HAR listing…';
+  try { const d = await harRead(url); a.disabled = false; if (!d.address) throw new Error("HAR didn't give us the address. Type it in instead."); pick(d.address, { pending: true }); }
+  catch (e) { a.disabled = false; a.value = ''; a.placeholder = e.message || "We couldn't read that link. Type the address instead."; } }
+$('harGo7').onclick = async () => { const url = ($('harLink7').value || '').trim(), b = $('harGo7'); if (!HAR_URL.test(url)) { $('lcOut').innerHTML = '<li>Paste the link from har.com (it starts with har.com/homedetail/...).</li>'; $('lcOut').hidden = false; return; }
+  b.disabled = true; b.textContent = 'Checking…'; try { await harRead(url); saveNow(); } catch (e) { $('lcOut').innerHTML = `<li>${esc(e.message || 'Could not read that listing.')}</li>`; $('lcOut').hidden = false; } b.disabled = false; b.textContent = 'Check my listing'; };
+// Listing appointment kit: not built yet. Agents who ask get recorded (waitlist table) so the owner knows the demand.
+$('apptGo').onclick = async () => { const b = $('apptGo'); b.disabled = true; try { const u = (await LO.session())?.user?.id; if (u) await LO.sb.from('waitlist').insert({ user_id: u, product: 'listing-appointment', address: order.addr || null }); } catch (e) { console.warn('waitlist', e); } b.textContent = "Got it. We'll email you."; };
+
+// ---------- 7. satellite kit ----------
+$('back7').onclick = () => go(1);
+$('go7').onclick = async () => { $('go7').hidden = true; $('err7').hidden = true; $('busy7').hidden = false;
+  try { await LO.sat.buildKit(order, { onProgress: t => { $('busy7t').textContent = t; } });
+    order.fixing = -1; cur = 0; $('h3').textContent = 'Is the lot where it should be?'; $('p3').textContent = 'County lines, placed on the close-up. Drag only if something is off; every other image follows this one.'; $('acts3').hidden = false; $('acts3fix').hidden = true; go(3); }
+  catch (e) { console.warn(e); $('err7').textContent = e.message || 'Something went wrong building the kit. Try again in a moment.'; $('err7').hidden = false; }
+  $('busy7').hidden = true; $('go7').hidden = false; };
+
+// ---------- examples (photo 1 placed; others carried by the reconstruction) ----------
+const EXAMPLES = {
+  maroneal: { addr:'3710 Maroneal St, Houston, TX 77025', parcel:{ cad:'Harris CAD', dims:'60 × 132 ft · 4 corners', pts:'12,4 28,4 28,26 12,26' }, photos:[
+    { name:'DJI_0412.jpg', src:'maroneal.jpg', mask:'maroneal_occ.png', pts:[[628,228],[1054,228],[1050,1030],[550,1030]] },
+    { name:'DJI_0409.jpg', src:'maroneal_2.jpg', pts:[[787,514],[1151,436],[1476,987],[1069,1108]], carried:true, conf:0.54 },
+    { name:'DJI_0411.jpg', src:'maroneal_3.jpg', pts:[[358,628],[726,281],[1468,751],[1210,1154]], carried:true, conf:0.75 } ] },
+  lakeside: { addr:'65 Lakeside Dr, Galveston, TX 77554', parcel:{ cad:'Galveston CAD', dims:'canal-front lot · 4 corners', pts:'6,8 34,8 36,22 6,22' }, photos:[
+    { name:'DJI_0031.jpg', src:'lakeside_1.jpg', mask:'lakeside_1_occ.png', pts:[[496,950],[1618,950],[1724,1447],[506,1447]] },
+    { name:'DJI_0019.jpg', src:'lakeside_2.jpg', pts:[[900,1100],[1700,1100],[1700,1600],[900,1600]], carried:false, conf:0.19 },
+    { name:'DJI_0033.jpg', src:'lakeside_3.jpg', pts:[[341,874],[1575,925],[1557,1516],[341,1457]], carried:true, conf:0.97 } ] },
+};
+document.querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
+  const ex = EXAMPLES[b.dataset.ex]; setFlow('photos'); pick(ex.addr, ex.parcel); order.photos = []; let loaded = 0;
+  ex.photos.forEach((ph, i) => { const img = new Image(); img.onload = () => {
+    const p = { name: ph.name, src: ph.src, maskSrc: ph.mask || null, img, pts: ph.pts.map(([x,y]) => ({x,y})), auto: ph.pts.map(([x,y]) => ({x,y})), carriedPts: ph.carried ? ph.pts.map(([x,y]) => ({x,y})) : null, exConf: ph.conf, mask: null, example: true };
+    order.photos[i] = p; if (ph.mask) { const m = new Image(); m.onload = () => { p.mask = m; }; m.src = ph.mask; }
+    if (++loaded === ex.photos.length) { renderGrid2(); go(2); } }; img.src = ph.src; }); });
+
+// ---------- 2. photos ----------
+$('drop').onclick = () => $('file').click(); $('drop').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') $('file').click(); };
+$('file').onchange = e => addFiles(e.target.files);
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => addFiles(e.dataTransfer.files));
+document.addEventListener('dragover', e => e.preventDefault()); document.addEventListener('drop', e => { e.preventDefault(); if (order.step === 2 && !e.target.closest('#drop')) addFiles(e.dataTransfer.files); });
+function photosChanged(){ order.pinIdxSet = false; order.pinIdx = 0; }
+// ---- drone data: GPS, height and gimbal angles from the original drone file (DJI writes them; HAR/Zillow copies drop them) ----
+const EXIFR_URL = 'https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js'; let exifrP = null;
+const loadExifr = () => exifrP || (exifrP = new Promise((res, rej) => { if (window.exifr) return res(window.exifr); const sc = document.createElement('script'); sc.src = EXIFR_URL; sc.onload = () => res(window.exifr); sc.onerror = () => { exifrP = null; rej(new Error('exifr did not load')); }; document.head.appendChild(sc); }));
+async function droneMeta(file){ try { const ex = await loadExifr(); const r = await ex.parse(file, { xmp: true, gps: true, tiff: true, exif: true }); if (!r) return null;
+  const n = v => v == null || v === '' ? NaN : +v; const m = { lat: n(r.latitude), lng: n(r.longitude), h: n(r.RelativeAltitude), yaw: n(r.GimbalYawDegree), pitch: n(r.GimbalPitchDegree), roll: n(r.GimbalRollDegree) || 0, f35: n(r.FocalLengthIn35mmFormat), model: r.Model || '' };
+  return [m.lat, m.lng, m.h, m.yaw, m.pitch, m.f35].every(Number.isFinite) && m.h > 2 && m.pitch < -5 ? m : null; } catch (e) { console.warn('drone data', e); return null; } }
+// Pinhole camera from the drone data. Ground is flat at take-off height; x east, y north, z up, meters from photo 1's camera.
+const D2R = Math.PI / 180, dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2], cross = (a, b) => [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
+function droneCam(m, W, H, ref){ const y = m.yaw * D2R, pt = m.pitch * D2R, r = m.roll * D2R;
+  const f = [Math.sin(y) * Math.cos(pt), Math.cos(y) * Math.cos(pt), Math.sin(pt)], R0 = [Math.cos(y), -Math.sin(y), 0], U0 = cross(R0, f), c = Math.cos(r), s = Math.sin(r);
+  const R = R0.map((v, i) => c * v + s * U0[i]), U = R0.map((v, i) => -s * v + c * U0[i]);
+  const C = [(m.lng - ref.lng) * 111320 * Math.cos(ref.lat * D2R), (m.lat - ref.lat) * 110540, m.h], fx = m.f35 / 36 * W;
+  return { proj: P => { const v = [P[0] - C[0], P[1] - C[1], P[2] - C[2]], z = dot(v, f); return { x: W / 2 + fx * dot(v, R) / z, y: H / 2 - fx * dot(v, U) / z, z }; },
+    ground: (u, v) => { const a = (u - W / 2) / fx, b = (v - H / 2) / fx, d = [0, 1, 2].map(i => f[i] + a * R[i] - b * U[i]); if (d[2] > -1e-6) return null; const t = -C[2] / d[2]; return [C[0] + t * d[0], C[1] + t * d[1], 0]; } }; }
+function addFiles(files){ photosChanged(); [...files].filter(f => f.type.startsWith('image/')).forEach(f => { const img = new Image(); img.onload = () => {
+  const p = { name: f.name, img, pts: [], auto: null, carriedPts: null, mask: null, meta: null, file: f }; droneMeta(f).then(m => { p.meta = m; });
+  if (order.photos.length === 0) { // parcel placed on photo 1: centered box until the real fit runs
+    const W = img.naturalWidth, H = img.naturalHeight; p.auto = [[.3,.2],[.7,.2],[.7,.85],[.3,.85]].map(([x,y]) => ({ x: x*W, y: y*H })); p.pts = p.auto.map(q => ({...q})); }
+  order.photos.push(p); renderGrid2(); uploadPending(); }; img.src = URL.createObjectURL(f); }); }
+// HAR link -> photos. The edge function only turns the link into a list of image URLs (har.com's gallery API has no CORS);
+// the images themselves load straight from mediahar.harstatic.com, which is CORS-open. Largest HAR serves is 1024 px.
+const HAR_FN = 'https://vuodmczixoplpmpypcmj.supabase.co/functions/v1/har-gallery';
+function addUrl(url, name, done){ const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => {
+  const p = { name, img, pts: [], auto: null, carriedPts: null, mask: null, src: url };
+  if (order.photos.length === 0) { const W = img.naturalWidth, H = img.naturalHeight; p.auto = [[.3,.2],[.7,.2],[.7,.85],[.3,.85]].map(([x,y]) => ({ x: x*W, y: y*H })); p.pts = p.auto.map(q => ({...q})); }
+  order.photos.push(p); renderGrid2(); done && done(true); }; img.onerror = () => done && done(false); img.src = url; }
+async function pullHar(){ const url = ($('harLink').value || '').trim(), msg = $('harMsg'), b = $('harGo');
+  if (!/^https?:\/\/(www\.|www-v2\.)?har\.com\//i.test(url)) { msg.hidden = false; msg.textContent = 'Paste the listing link from har.com (it starts with har.com/homedetail/...).'; return; }
+  b.disabled = true; b.textContent = 'Reading the listing…'; msg.hidden = false; msg.textContent = '';
+  try { const r = await fetch(HAR_FN, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) }); const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'HAR did not answer.');
+    order.harLink = url; order.har = { harid: d.harid, mlsid: d.mlsid, address: d.address };
+    if (d.address && !order.addr) { order.addr = d.address; if ($('addr')) $('addr').value = d.address; }
+    const list = d.photos.slice(0, 40); let n = 0, k = 0; b.textContent = `Loading ${list.length} photos…`;
+    await Promise.all(list.map(ph => new Promise(res => addUrl(ph.url, `HAR ${ph.position}`, ok => { if (ok) k++; n++; b.textContent = `Loading ${n} of ${list.length}…`; res(); }))));
+    order.photos.sort((a, b2) => (parseInt(a.name.replace(/\D/g,'')) || 0) - (parseInt(b2.name.replace(/\D/g,'')) || 0)); renderGrid2();
+    msg.textContent = `${k} photos pulled from HAR${d.address ? ' for ' + d.address : ''}. Remove any that aren't aerials. HAR photos top out at 1024 px, so originals from the photographer come out cleaner.` + (d.photos.length > 40 ? ' Only the first 40 were loaded.' : '');
+  } catch (e) { msg.textContent = e.message || 'Could not read that listing. Upload the photos instead.'; }
+  b.disabled = false; b.textContent = 'Pull photos from HAR'; }
+$('harGo').onclick = pullHar; $('harLink').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); pullHar(); } });
+function renderGrid2(){ const g = $('grid2'); g.innerHTML = '';
+  order.photos.forEach((p, i) => { const d = document.createElement('div'); d.className = 'th'; d.style.animationDelay = (i * 40) + 'ms';
+    const im = document.createElement('img'); im.src = p.img.src; im.alt = p.name; d.appendChild(im);
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1; d.appendChild(n);
+    const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.setAttribute('aria-label', 'Remove photo ' + (i+1)); x.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="#1E2A22" stroke-width="2" stroke-linecap="round"/></svg>';
+    x.onclick = () => { const [gone] = order.photos.splice(i, 1); if (gone && gone.path) LO.sb.storage.from('order-photos').remove([gone.path]); photosChanged(); renderGrid2(); }; d.appendChild(x); g.appendChild(d); });
+  const k = order.photos.length, pr = priceFor(k);
+  $('cnt').textContent = k ? `${k} photo${k>1?'s':''}${k < 5 ? ' · add ' + (5-k) + ' more' : ''}${k > 40 ? ' · 40 is the most per order' : ''}` : 'No photos yet';
+  const pe = $('price'); pe.style.opacity = 0; setTimeout(() => { pe.textContent = fmt(pr); pe.style.opacity = 1; }, reduced ? 0 : 130);
+  $('go2').disabled = !(k >= 5 || (k >= 1 && order.photos[0].example)) || k > 40; }
+$('back2').onclick = () => go(1);
+// Photo 1 starts in the county's shape (all adjoining parcels combined), north up and centered, so the agent only moves corners.
+// Re-seeded whenever the parcels change (going back to add one), never on an unchanged order.
+// Share of the frame (from the top) that looks like sky: a quick read of how steep the camera angle is.
+function skyRows(img){ try { const c = document.createElement('canvas'); c.width = 48; c.height = 36; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 48, 36);
+  const d = g.getImageData(0, 0, 48, 36).data; let rows = 0; for (let y = 0; y < 18; y++) { let sk = 0; for (let x = 0; x < 48; x++) { const i = (y * 48 + x) * 4, r = d[i], gg = d[i + 1], b = d[i + 2]; if ((b > r + 6 && b > 120) || (r > 175 && gg > 175 && b > 175)) sk++; } if (sk > 48 * 0.6) rows++; else break; }
+  return rows / 36; } catch (e) { return 0; } }
+function seedFromParcel(){ const p = order.photos[order.pinIdx || 0], U = order.geoRing; if (!p || !U || U.length < 3 || !(order.parcelList || []).length) return;
+  const key = JSON.stringify(U.map(q => [q.lng.toFixed(7), q.lat.toFixed(7)])); if (p.seedKey === key) return;
+  const all = (order.groups && order.groups.length > 1 ? order.groups.flatMap(g => g.ring) : U), F = feetFrame([all]), A = all.map(F.to), R = U.map(F.to);
+  const xs = A.map(q => q.x), ys = A.map(q => q.y), w = Math.max(...xs) - Math.min(...xs) || 1, h = Math.max(...ys) - Math.min(...ys) || 1;
+  const W = p.img.naturalWidth, H = p.img.naturalHeight, k = Math.min(W * 0.6 / w, H * 0.6 / h), mx = (Math.max(...xs) + Math.min(...xs)) / 2, my = (Math.max(...ys) + Math.min(...ys)) / 2;
+  // Tilt it to the camera: a horizon in the top of the frame means an oblique shot, so the far side gets shorter and the depth flattens.
+  const sky = skyRows(p.img), tilt = sky > 0.04 ? 1 : sky > 0.01 ? 0.6 : 0.25, vy = 1 - 0.45 * tilt, taper = 1 - 0.32 * tilt;
+  const hw = w * k / 2, hh = h * k * vy / 2, cx = W / 2, cy = H / 2 + (sky > 0.01 ? H * 0.06 : 0);
+  const box = [{ x: -w / 2, y: h / 2 }, { x: w / 2, y: h / 2 }, { x: w / 2, y: -h / 2 }, { x: -w / 2, y: -h / 2 }];
+  const trap = [{ x: cx - hw * taper, y: cy - hh }, { x: cx + hw * taper, y: cy - hh }, { x: cx + hw, y: cy + hh }, { x: cx - hw, y: cy + hh }];
+  const T = homography(box, trap) || (q => ({ x: cx + q.x * k, y: cy - q.y * k }));
+  p.auto = R.map(q => T({ x: q.x - mx, y: q.y - my })); p.pts = p.auto.map(q => ({ ...q })); p.seedKey = key; p.placed = false;
+  order.photos.slice(1).forEach(o => { o.carriedPts = null; }); }
+// Line the starter outline up with the photo: send the numbered satellite view and photo 1 to the place-pins function, which
+// matches roads, roofs and other landmarks and returns each corner in the photo. Only replaces pins the agent hasn't touched.
+const jpeg64 = (img, max = 1568) => { const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85).split(',')[1]; };
+const placeMsg = t => { $('placing').hidden = !t; $('placingT').textContent = t || ''; };
+// Which photo the agent confirms pins on: the most top-down shot (least sky) is the easiest to match; the gallery order never changes.
+function pickPinPhoto(){ const P = order.photos; if (isSat() || P.length < 2 || P.some(p => p.example)) return; if (order.pinIdxSet) return;
+  // Prefer a photo that still has its drone data: the pins on it are what every other angle is started from.
+  const anyMeta = P.some(p => p.meta); let best = 0, bs = Infinity; P.slice(0, 20).forEach((p, i) => { const sk = skyRows(p.img) + i * 0.002 + (anyMeta && !p.meta ? 1000 : 0); if (sk < bs) { bs = sk; best = i; } }); order.pinIdx = best; }
+async function autoPlace(){ if (await askBestPhoto()) { seedFromParcel(); cur = order.pinIdx || 0; if (order.step === 3) { fitView(); draw(); $('p3').textContent = `We started the outline on photo ${cur + 1}, the clearest view of the lot. If our automated map disagrees with the boundary line, drag a pin. We then recreate the same markers on the other ${order.photos.length - 1} photos.`; } } const p = order.photos[order.pinIdx || 0]; if (isSat() || !p || !p.seedKey || p.placed || !LO.sb) return; const key = p.seedKey, untouched = () => JSON.stringify(p.pts) === JSON.stringify(p.auto);
+  if (!untouched()) return; placeMsg('Lining the outline up with the roads and houses in your photo…'); $('placingDot').hidden = false;
+  try { const ref = await ensureRef(); if (!ref || p.seedKey !== key) return placeMsg('');
+    const { data, error } = await LO.sb.functions.invoke('place-pins', { body: { sat: jpeg64(ref.img), photo: jpeg64(p.img), n: p.pts.length, sides: ref.sides } });
+    if (p.seedKey !== key) return placeMsg('');
+    if (error || !data || !data.corners) { placeMsg(''); return; }
+    const W = p.img.naturalWidth, H = p.img.naturalHeight, P = data.corners.map(([x, y]) => ({ x: x * W, y: y * H }));
+    const area = Math.abs(P.reduce((t, a, i) => { const b = P[(i + 1) % P.length]; return t + a.x * b.y - b.x * a.y; }, 0)) / 2 / (W * H);
+    if (data.confidence < 0.3 || area < 0.005 || area > 0.95) { $('placingDot').hidden = true; placeMsg("We couldn't match this photo to the satellite view with confidence, so the starter shape is only angled. Drag the corners onto the lot."); return; }
+    p.placed = true; if (!untouched()) return placeMsg(''); p.auto = P; p.pts = P.map(q => ({ ...q })); cur = order.pinIdx || 0; fitView(); draw(); $('placingDot').hidden = true;
+    placeMsg(`Starter outline lined up from landmarks${data.note ? ' (' + data.note.replace(/\.$/, '') + ')' : ''}. It's a best guess: check every corner.`); }
+  catch (e) { console.warn('place', e); placeMsg(''); } }
+async function ensureRef(){ const k = JSON.stringify(order.geoRing || []); if (order.ref && order.refRing === k) return order.ref; const r = await LO.sat.parcelCheck(order); if (r) { order.ref = r; order.refRing = k; } return r; }
+// Let the vision model look over the shots (small copies) and pick the one where the lot is easiest to find. One cheap call.
+async function askBestPhoto(){ const P = order.photos; if (isSat() || P.length < 2 || order.pinIdxSet || !LO.sb || P.some(p => p.example)) return false; order.pinIdxSet = true;
+  const p0 = P[order.pinIdx || 0]; if (JSON.stringify(p0.pts) !== JSON.stringify(p0.auto)) return false;
+  try { placeMsg('Looking over your photos for the clearest view of the lot…'); const ref = await ensureRef(); if (!ref) return false; const list = P.slice(0, 12);
+    const { data, error } = await LO.sb.functions.invoke('place-pins', { body: { mode: 'pick', sat: jpeg64(ref.img, 1024), photos: list.map(p => jpeg64(p.img, 512)) } });
+    if (error || !data || !Number.isInteger(data.best) || data.best < 0 || data.best >= list.length || data.best === (order.pinIdx || 0)) return false;
+    if (JSON.stringify(p0.pts) !== JSON.stringify(p0.auto)) return false; order.pinIdx = data.best; cur = data.best; return true; }
+  catch (e) { return false; } }
+const starterBox = p => { const W = p.img.naturalWidth, H = p.img.naturalHeight; p.auto = [[.3,.2],[.7,.2],[.7,.85],[.3,.85]].map(([x,y]) => ({ x: x*W, y: y*H })); p.pts = p.auto.map(q => ({...q})); };
+$('go2').onclick = () => { pickPinPhoto(); { const pp = order.photos[order.pinIdx || 0]; if (pp && !pp.pts.length) starterBox(pp); } seedFromParcel(); setTimeout(autoPlace, 50); order.fixing = -1; cur = order.pinIdx || 0; order.harLink = ($('harLink').value || '').trim(); $('h3').textContent = 'Are the pins on the fence?'; $('p3').textContent = `We put the county parcel on photo ${(order.pinIdx || 0) + 1}${order.pinIdx ? ', the clearest view of the lot' : ''}. We're usually right, but we want to be sure: if our automated map disagrees with the boundary line, drag a pin. We then recreate the same markers on the other ${order.photos.length - 1} photos you uploaded.`; $('acts3').hidden = false; $('acts3fix').hidden = true; go(3); };
+
+// ---------- 3. confirm pins: canvas engine ----------
+const cv = $('cv'), ctx = cv.getContext('2d'), stage = $('stage');
+const view = { z:1, ox:0, oy:0, fit:1 }; let cur = 0, drag = -1, hover = -1, moved = false, panning = null, locked = false, sim = null;
+const inside = (sp, pts) => cv2pt(sp, pts);
+function cv2pt(sp, pts){ let c = false; const S = pts.map(toScr); for (let i = 0, j = S.length-1; i < S.length; j = i++) { if ((S[i].y > sp.y) !== (S[j].y > sp.y) && sp.x < (S[j].x-S[i].x)*(sp.y-S[i].y)/(S[j].y-S[i].y)+S[i].x) c = !c; } return c; }
+const setMode = l => { locked = l; [['modeLock', l], ['modeFree', !l]].forEach(([id, on]) => { $(id).classList.toggle('on', on); $(id).setAttribute('aria-checked', on); }); draw(); };
+$('modeLock').onclick = () => setMode(true); $('modeFree').onclick = () => setMode(false);
+const HANDLE = 11;
+function resize(){ if (order.step === 3) setTimeout(resNote, 0); const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr); draw(); }
+window.addEventListener('resize', () => { if (order.step === 3) { const f = view.z === view.fit; resize(); if (f) fitView(); } });
+function fitView(){ const p = order.photos[cur]; if (!p) return; const r = stage.getBoundingClientRect(); view.fit = Math.min(r.width/p.img.naturalWidth, r.height/p.img.naturalHeight); view.z = view.fit;
+  view.ox = (r.width - p.img.naturalWidth*view.z)/2; view.oy = (r.height - p.img.naturalHeight*view.z)/2; $('cap').textContent = (p.label ? p.label : `Photo ${cur+1} of ${order.photos.length}`) + (order.parcel ? ' · ' + order.parcel.cad : ''); resNote(); draw(); }
+function resNote(){ const p = order.photos[cur]; if (!p) return; const W = p.img.naturalWidth, H = p.img.naturalHeight, dpr = window.devicePixelRatio || 1;
+  const sw = Math.min(W, Math.round(W*view.z*dpr)), sh = Math.round(sw*H/W); const times = (W*H)/(sw*sh); const fmtN = n => n.toLocaleString();
+  const more = times >= 1.5 ? `about ${times >= 10 ? Math.round(times) : times.toFixed(1)}× the pixels you see here` : 'the same resolution you see here';
+  $('res3t').innerHTML = `You're placing pins on a ${fmtN(sw)} × ${fmtN(sh)} px screen copy. The finished file is <b>${fmtN(W)} × ${fmtN(H)} px</b> (${isSat() ? 'the full kit image' : 'your original\'s full resolution'}, ${more}).`; }
+window.addEventListener('resize', () => { if (order.step === 3) resNote(); });
+function zoomAt(f, sx, sy){ const nz = Math.max(view.fit*0.5, Math.min(view.fit*12, view.z*f)); const k = nz/view.z; view.ox = sx - (sx-view.ox)*k; view.oy = sy - (sy-view.oy)*k; view.z = nz; resNote(); draw(); }
+$('zIn').onclick = () => { const r = stage.getBoundingClientRect(); zoomAt(1.4, r.width/2, r.height/2); };
+$('zOut').onclick = () => { const r = stage.getBoundingClientRect(); zoomAt(1/1.4, r.width/2, r.height/2); };
+$('zFit').onclick = fitView;
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.15 : 1/1.15, e.clientX - r.left, e.clientY - r.top); }, { passive:false });
+const toImg = (sx, sy) => ({ x:(sx-view.ox)/view.z, y:(sy-view.oy)/view.z });
+const toScr = p => ({ x:p.x*view.z+view.ox, y:p.y*view.z+view.oy });
+function spos(e){ const r = cv.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
+function hit(sp, pts){ for (let i = 0; i < pts.length; i++) { const q = toScr(pts[i]); if (Math.hypot(q.x-sp.x, q.y-sp.y) < HANDLE*1.6) return i; } return -1; }
+function segHit(sp, pts){ const n = pts.length; for (let i = 0; i < n; i++) { const a = toScr(pts[i]), b = toScr(pts[(i+1)%n]);
+  const dx = b.x-a.x, dy = b.y-a.y, L = dx*dx+dy*dy || 1; let t = ((sp.x-a.x)*dx+(sp.y-a.y)*dy)/L; t = Math.max(0, Math.min(1, t)); if (Math.hypot(a.x+t*dx-sp.x, a.y+t*dy-sp.y) < 10) return i; } return -1; }
+cv.addEventListener('pointerdown', e => { const p = order.photos[cur], sp = spos(e);
+  if (e.button === 0 && locked) { const h = hit(sp, p.pts); const cen = { x: p.pts.reduce((a, q) => a + q.x, 0)/p.pts.length, y: p.pts.reduce((a, q) => a + q.y, 0)/p.pts.length };
+    if (h >= 0) { sim = { kind:'turn', cen, start: toImg(sp.x, sp.y), pts: p.pts.map(q => ({...q})) }; cv.setPointerCapture(e.pointerId); return; }
+    if (inside(sp, p.pts)) { sim = { kind:'slide', start: toImg(sp.x, sp.y), pts: p.pts.map(q => ({...q})) }; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; return; } }
+  if (e.button === 1 || (e.button === 0 && hit(sp, p.pts) < 0)) { panning = { x:sp.x, y:sp.y, ox:view.ox, oy:view.oy }; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; return; }
+  if (e.button !== 0) return; const h = hit(sp, p.pts); if (h >= 0) { drag = h; lastPin = h; moved = false; cv.setPointerCapture(e.pointerId); } });
+cv.addEventListener('pointermove', e => { const sp = spos(e), p = order.photos[cur];
+  if (sim) { const now = toImg(sp.x, sp.y);
+    if (sim.kind === 'slide') { const dx = now.x - sim.start.x, dy = now.y - sim.start.y; p.pts = sim.pts.map(q => ({ x:q.x+dx, y:q.y+dy })); }
+    else { const a0 = sim.start, c = sim.cen; const r0 = Math.hypot(a0.x-c.x, a0.y-c.y) || 1, r1 = Math.hypot(now.x-c.x, now.y-c.y); const k = r1/r0, th = Math.atan2(now.y-c.y, now.x-c.x) - Math.atan2(a0.y-c.y, a0.x-c.x);
+      const cs = Math.cos(th), sn = Math.sin(th); p.pts = sim.pts.map(q => { const x = q.x-c.x, y = q.y-c.y; return { x: c.x + k*(x*cs - y*sn), y: c.y + k*(x*sn + y*cs) }; }); }
+    draw(); return; }
+  if (panning) { view.ox = panning.ox + (sp.x-panning.x); view.oy = panning.oy + (sp.y-panning.y); draw(); return; }
+  if (drag >= 0) { p.pts[drag] = toImg(sp.x, sp.y); moved = true; draw(); return; }
+  const h = hit(sp, p.pts); if (h !== hover) { hover = h; draw(); } cv.style.cursor = h >= 0 ? 'grab' : (locked && inside(sp, p.pts) ? 'grab' : 'move'); });
+cv.addEventListener('pointerup', () => { if (sim) { sim = null; cv.style.cursor = 'move'; draw(); return; } if (panning) { panning = null; cv.style.cursor = 'move'; return; } if (drag >= 0 && moved) settle(drag); drag = -1; });
+cv.addEventListener('dblclick', e => { if (locked) return; const p = order.photos[cur], sp = spos(e); if (hit(sp, p.pts) >= 0) return; const s = segHit(sp, p.pts); if (s >= 0) { p.pts.splice(s+1, 0, toImg(sp.x, sp.y)); lastPin = s + 1; draw(); } });
+cv.addEventListener('contextmenu', e => { e.preventDefault(); if (locked) return; const p = order.photos[cur], h = hit(spos(e), p.pts); if (h >= 0 && p.pts.length > 3) { p.pts.splice(h, 1); draw(); } });
+// Pin tools: clear to four fresh pins, add as many as the lot needs, remove the last one touched (never below three).
+let lastPin = -1;
+const pinCount = () => { const p = order.photos[cur], n = p ? p.pts.length : 0; $('pCount').textContent = n ? `${n} pins` : ''; $('pDel').disabled = n <= 3; };
+$('pClear').onclick = () => { const p = order.photos[cur]; if (!p) return; setMode(false);
+  const c = toImg(cv.clientWidth / 2, cv.clientHeight / 2), W = p.img.naturalWidth, H = p.img.naturalHeight, r = Math.min(W, H) * 0.16 * (view.fit / view.z || 1);
+  p.pts = [[-1,-1],[1,-1],[1,1],[-1,1]].map(([a, b]) => ({ x: Math.min(W, Math.max(0, c.x + a * r)), y: Math.min(H, Math.max(0, c.y + b * r)) })); lastPin = -1; draw(); pinCount(); };
+$('pAdd').onclick = () => { const p = order.photos[cur]; if (!p || p.pts.length < 2) return; setMode(false);
+  let best = 0, L = -1; p.pts.forEach((a, i) => { const b = p.pts[(i + 1) % p.pts.length], d = Math.hypot(b.x - a.x, b.y - a.y); if (d > L) { L = d; best = i; } });
+  const a = p.pts[best], b = p.pts[(best + 1) % p.pts.length]; p.pts.splice(best + 1, 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); lastPin = best + 1; draw(); settle(best + 1); pinCount(); };
+$('pDel').onclick = () => { const p = order.photos[cur]; if (!p || p.pts.length <= 3) return; setMode(false);
+  const i = lastPin >= 0 && lastPin < p.pts.length ? lastPin : p.pts.length - 1; p.pts.splice(i, 1); lastPin = -1; draw(); pinCount(); };
+let settleT = 0;  // pin settle on release: 180 ms small spring
+function settle(i){ if (reduced) return; const t0 = performance.now(); settleT = i; const run = () => { const t = (performance.now()-t0)/180; if (t < 1) { draw(1 + Math.sin(t*Math.PI)*0.18); requestAnimationFrame(run); } else { settleT = -1; draw(); } }; run(); }
+$('reset').onclick = () => { const p = order.photos[cur]; if (p.auto) { p.pts = p.auto.map(q => ({...q})); draw(); } };
+function draw(bump){ const p = order.photos[cur]; if (!p || cv.hidden) return; const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(p.img, view.ox, view.oy, p.img.naturalWidth*view.z, p.img.naturalHeight*view.z);
+  const S = p.pts.map(toScr); if (!S.length) return;
+  ctx.save(); ctx.globalAlpha = 0.45; ctx.fillStyle = '#FFD630'; ctx.beginPath(); S.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.fill(); ctx.restore();
+  for (const [w, c] of [[10,'rgba(0,0,0,.5)'],[6.5,'#FFFFFF'],[3.5,'#E62E2E']]) { /* red line on a white edge: reads on trees, grass and roofs */ ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); S.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.stroke(); }
+  { const ov = overlay(p.pts); if (ov) { ctx.save(); ctx.lineJoin = 'round';
+      ov.outlines.forEach(P => { const Q = P.map(toScr); ctx.globalAlpha = 0.45; ctx.fillStyle = '#FFD630'; ctx.beginPath(); Q.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+        for (const [w, c] of [[8,'rgba(0,0,0,.45)'],[5,'#FFFFFF'],[2.5,'#E62E2E']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); Q.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.stroke(); } });
+      ctx.setLineDash([9, 7]); for (const [w, c] of [[4,'rgba(0,0,0,.4)'],[2,'#FFFFFF']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ov.segs.forEach(([a, b]) => { const A = toScr(a), B = toScr(b); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); }); ctx.stroke(); }
+      ctx.restore(); } }
+  S.forEach((q, i) => { let r = (i === hover || i === drag) ? HANDLE*1.25 : HANDLE; if (bump && i === settleT) r *= bump;
+    ctx.beginPath(); ctx.arc(q.x, q.y, r+2, 0, Math.PI*2); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.beginPath(); ctx.arc(q.x, q.y, r*0.5, 0, Math.PI*2); ctx.fillStyle = '#E62E2E'; ctx.fill();
+    ctx.font = `800 ${Math.round(r*1.1)}px Figtree, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(String(i+1), q.x + r*1.6, q.y - r*1.2); ctx.fillStyle = '#fff'; ctx.fillText(String(i+1), q.x + r*1.6, q.y - r*1.2); });
+  pinCount(); $('zVal').textContent = Math.abs(view.z-view.fit) < 1e-6 ? 'fit' : Math.round(view.z/view.fit*100) + '%'; }
+
+// "Use these pins for all photos" -> carry
+$('go3').onclick = () => { if (isSat()) { LO.sat.carry(order, 0); go(5); return; }
+  // Each other photo starts from where its camera was: photo 1's pins go down onto the ground through photo 1's drone camera and back up
+  // through that photo's camera. Drone compass and GPS are a few degrees and meters off, so these still need a check (and the server-side
+  // matching pass) before anything is called placed; without drone data the pins are only copied over.
+  const src = order.photos[order.pinIdx || 0], sm = src.meta, ref = sm && { lat: sm.lat, lng: sm.lng };
+  const A = sm && droneCam(sm, src.img.naturalWidth, src.img.naturalHeight, ref), G = A ? src.pts.map(q => A.ground(q.x, q.y)) : null;
+  order.photos.forEach((p, i) => { if (i === (order.pinIdx || 0)) return; p.why = '';
+  if (p.carriedPts) { p.pts = p.carriedPts.map(q => ({...q})); p.conf = p.exConf ?? 0.96; return; }
+  const copy = () => { const sx = p.img.naturalWidth/src.img.naturalWidth, sy = p.img.naturalHeight/src.img.naturalHeight; p.pts = src.pts.map(q => ({ x:q.x*sx, y:q.y*sy })); };
+  p.conf = p.exConf ?? 0.5;
+  if (!p.meta) { copy(); p.why = 'nodata'; return; }
+  if (!G || !G.every(Boolean)) { copy(); p.why = sm ? 'out' : 'srcnodata'; return; }
+  const W = p.img.naturalWidth, H = p.img.naturalHeight, P = G.map(g => droneCam(p.meta, W, H, ref).proj(g));
+  if (!P.every(q => q.z > 0)) { copy(); p.why = 'out'; return; }
+  p.pts = P.map(q => ({ x: q.x, y: q.y })); const xs = p.pts.map(q => q.x), ys = p.pts.map(q => q.y);
+  p.why = Math.max(...xs) < 0 || Math.min(...xs) > W || Math.max(...ys) < 0 || Math.min(...ys) > H ? 'out' : 'drone'; });
+  go(4); carry(); };
+// fixing one flagged photo from step 4
+function fixPhoto(i){ order.fixing = i; cur = i; $('h3').textContent = `Place the pins on photo ${i+1}.`; $('p3').textContent = 'We couldn\'t place this angle with confidence. Drag the pins onto the lot corners, then save.'; $('acts3').hidden = true; $('acts3fix').hidden = false; go(3); }
+$('go3fix').onclick = () => { order.photos[order.fixing].conf = 1; order.photos[order.fixing].fixed = true; order.fixing = -1; go(4); carry(true); };
+
+// ---------- 4. carrying ----------
+function thumbCanvas(p, w){ const h = Math.round(w * p.img.naturalHeight / p.img.naturalWidth); const c = renderFinal(p.img, p.pts, p.mask, w, h); return c; }
+function carry(instant){ const g = $('grid4'); g.innerHTML = ''; let done = 0, flagged = 0;
+  order.photos.forEach((p, i) => { const d = document.createElement('div'); d.className = 'th wait'; d.style.animationDelay = (i*40) + 'ms';
+    const im = document.createElement('img'); im.src = p.img.src; im.alt = p.name; d.appendChild(im); const n = document.createElement('span'); n.className = 'n'; n.textContent = i+1; d.appendChild(n); g.appendChild(d);
+    const finish = () => { d.classList.remove('wait'); d.replaceChild(thumbCanvas(p, 360), im);
+      if (p.conf < 0.6 && !p.fixed) { flagged++; d.classList.add('flag'); const m = document.createElement('span'); m.className = 'flagmsg'; m.textContent = p.why === 'drone' ? 'Started from drone data, tap to check' : p.why === 'out' ? "Lot may be out of frame, tap to check" : p.why === 'nodata' ? 'No drone data in this file, tap to place' : p.why === 'srcnodata' ? 'Pinned photo has no drone data, tap to place' : "Couldn't place, tap to fix"; d.appendChild(m); d.onclick = () => fixPhoto(i); d.setAttribute('role','button'); d.tabIndex = 0; d.onkeydown = e => { if (e.key === 'Enter') fixPhoto(i); }; }
+      else d.classList.add('ok');
+      if (++done === order.photos.length) { $('p4').innerHTML = flagged ? `<span style="color:var(--warn);font-weight:600">${flagged} photo${flagged>1?'s need':' needs'} your pins.</span> Tap it to fix, or carry on and we'll flag it in the order.` + (order.photos.filter(q => q.why === 'nodata').length > 1 ? ' <br><span style="font-size:15px">Photos downloaded from HAR or Zillow have the drone data stripped out. Upload the originals from the drone and every angle starts from where the camera was.</span>' : '') : '<span class="ok">All placed and checked.</span>'; $('go4').hidden = false; } };
+    setTimeout(finish, instant || reduced ? 0 : 350 + i*260); }); }
+$('go4').onclick = () => go(5);
+
+// ---------- final-look render (same engine as the pipeline's render stage, in canvas) ----------
+// Lines between adjoining parcels on a photo: fit a plane mapping (homography) from the outline's corners in feet to the pins on
+// that photo, then map each parcel's ring through it. Only when the photo's pins still match the outline corner for corner.
+function homography(src, dst){ const n = src.length; if (n < 4) return null;
+  const norm = P => { const cx = P.reduce((t, p) => t + p.x, 0) / n, cy = P.reduce((t, p) => t + p.y, 0) / n, d = P.reduce((t, p) => t + Math.hypot(p.x - cx, p.y - cy), 0) / n || 1, k = Math.SQRT2 / d; return { cx, cy, k, P: P.map(p => ({ x: (p.x - cx) * k, y: (p.y - cy) * k })) }; };
+  const A = norm(src), B = norm(dst); const M = Array.from({ length: 8 }, () => new Array(9).fill(0));
+  for (let i = 0; i < n; i++) { const { x, y } = A.P[i], { x: u, y: v } = B.P[i];
+    for (const [row, rhs] of [[[x, y, 1, 0, 0, 0, -u * x, -u * y], u], [[0, 0, 0, x, y, 1, -v * x, -v * y], v]]) for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) M[r][c] += row[r] * row[c]; M[r][8] += row[r] * rhs; } }
+  for (let c = 0; c < 8; c++) { let piv = c; for (let r = c + 1; r < 8; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r; [M[c], M[piv]] = [M[piv], M[c]]; if (Math.abs(M[c][c]) < 1e-12) return null;
+    for (let r = 0; r < 8; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k < 9; k++) M[r][k] -= f * M[c][k]; } }
+  const h = M.map((r, i) => r[8] / r[i]);
+  return p => { const x = (p.x - A.cx) * A.k, y = (p.y - A.cy) * A.k, w = h[6] * x + h[7] * y + 1; return { x: (h[0] * x + h[1] * y + h[2]) / w / B.k + B.cx, y: (h[3] * x + h[4] * y + h[5]) / w / B.k + B.cy }; }; }
+// Everything besides the main outline, mapped onto a photo through the same plane mapping: other nearby pieces of the
+// order (their own outlines) and the light dashed lines between adjoining parcels. Needs the photo's pins to still match
+// the main outline corner for corner.
+function overlay(pts){ const G = order.groups || [], U = order.geoRing; if (!U || !pts || pts.length !== U.length) return null;
+  if (G.length < 2 && !(G[0] && G[0].members.length > 1)) return null;
+  const F = feetFrame([U]), H = homography(U.map(F.to), pts); if (!H) return null;
+  const outlines = G.slice(1).map(g => g.ring.map(p => H(F.to(p)))), segs = [];
+  G.forEach(g => { if (g.members.length < 2) return; const UF = g.ring.map(F.to), near = p => Math.min(...UF.map((a, i) => segDist(p, a, UF[(i + 1) % UF.length]).d));
+    g.members.forEach(m => { const R = order.parcelList[m].ring.map(F.to); R.forEach((a, i) => { const b = R[(i + 1) % R.length]; if (near({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }) < 3 && near(a) < 3 && near(b) < 3) return; segs.push([H(a), H(b)]); }); }); });
+  return { outlines, segs }; }
+// Satellite kit: the line thins in step with the map. A frame zoomed out to 1/4 of the close-up's scale gets a line 1/4
+// as thick (map scale = 2^zoom x enlargement). Floor keeps it visible on the widest views. Photos and the parcel map: 1.
+function zoomFactor(img){ const p = order.photos.find(q => q.img === img), v = p && p.view; if (!v || v.kind !== 'sat') return 1;
+  const sc = q => Math.pow(2, q.z) * (q.s || 1), ref = Math.max(...order.photos.filter(q => q.view && q.view.kind === 'sat').map(q => sc(q.view)));
+  return ref > 0 ? Math.min(1, sc(v) / ref) : 1; }
+// Lot inset on the wider kit sheets (satellite.js view.inset): the agent's confirmed outline drawn into the close-up crop,
+// in the chosen look, so the inset always matches the close-up. Runs after the sheet's own render.
+function renderFinal(img, pts, mask, W, H){ const out = renderSheet(img, pts, mask, W, H); const pm = order.photos.find(q => q.img === img && q.view && q.view.inset); const ins = pm && pm.view.inset;
+  if (!ins || !order.geoRing || order.geoRing.length < 3) return out; const c = out.getContext('2d'), sx = W / img.naturalWidth, sy = H / img.naturalHeight, r = ins.rect;
+  const P = order.geoRing.map(g => { const q = ins.map(g); return { x: q.x * sx, y: q.y * sy }; });
+  c.save(); c.beginPath(); c.rect(r.x * sx, r.y * sy, r.w * sx, r.h * sy); c.clip(); c.beginPath(); P.forEach((q, i) => i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); c.closePath();
+  c.globalAlpha = st.fillA; c.fillStyle = st.fillColor; c.fill(); c.globalAlpha = st.lineA; c.strokeStyle = st.lineColor; c.lineJoin = 'round'; c.lineWidth = Math.max(2.5, r.w * sx * 0.009); c.stroke(); c.restore(); return out; }
+function renderSheet(img, pts, mask, W, H){ const out = document.createElement('canvas'); out.width = W; out.height = H; const c = out.getContext('2d'); c.drawImage(img, 0, 0, W, H);
+  { const pm = order.photos.find(q => q.img === img); if (pm && pm.view && pm.view.kind === 'map') return out; }  // parcel map: county lines as drawn, no pins, no look
+  if (!pts.length) return out; const useMask = mask && st.cover === 'ground'; const sx = W/img.naturalWidth, sy = H/img.naturalHeight;
+  const layer = document.createElement('canvas'); layer.width = W; layer.height = H; const L = layer.getContext('2d');
+  const ov = overlay(pts), polys = [pts, ...(ov ? ov.outlines : [])];
+  const path = () => { L.beginPath(); polys.forEach(P => { P.forEach((q, i) => i ? L.lineTo(q.x*sx, q.y*sy) : L.moveTo(q.x*sx, q.y*sy)); L.closePath(); }); };
+  if (st.fillMode === 'hatch') { // diagonal stripes in the highlight color, clipped to the lot
+    const gap = Math.max(4, W * st.hatchGap / 100), hw = Math.max(1.5, gap * 0.3); L.save(); path(); L.clip(); L.strokeStyle = st.fillColor; L.lineWidth = hw; L.lineCap = 'butt'; L.beginPath();
+    for (let x = -H; x < W + H; x += gap) { L.moveTo(x, H); L.lineTo(x + H, 0); } L.stroke(); L.restore(); }
+  else { L.fillStyle = st.fillColor; path(); L.fill(); }
+  if (useMask) { L.globalCompositeOperation = 'destination-out'; L.drawImage(mask, 0, 0, W, H); L.globalCompositeOperation = 'source-over'; }
+  c.save(); c.globalAlpha = st.fillA; c.globalCompositeOperation = st.fillMode === 'hatch' ? 'source-over' : st.fillMode; c.drawImage(layer, 0, 0); c.restore(); L.clearRect(0, 0, W, H);
+  const zf = zoomFactor(img), lw = Math.max(W * 0.002, 2, W*st.lineW/100*zf), u = Math.max(lw, W*0.004*zf, 3);
+  const inner = st.innerOn && ov && ov.segs.length ? ov.segs : null; if (inner) { // lighter dashed lines showing how the parcels fit together, kept inside the outline
+    L.save(); path(); L.clip(); L.globalAlpha = 0.9; L.strokeStyle = st.innerMatch ? st.lineColor : st.innerColor; L.lineWidth = Math.max(1.5, lw * 0.8); L.lineCap = 'butt'; L.setLineDash([u * 2.2, u * 1.7]);
+    L.beginPath(); inner.forEach(([a, b]) => { L.moveTo(a.x*sx, a.y*sy); L.lineTo(b.x*sx, b.y*sy); }); L.stroke(); L.restore(); }
+  L.strokeStyle = st.lineColor; L.lineWidth = lw; L.lineJoin = 'round'; L.lineCap = st.dash === 'dash' || st.dash === 'dashdot' ? 'butt' : 'round';
+  L.setLineDash(st.dash === 'dash' ? [u*4, u*2.5] : st.dash === 'dashdot' ? [u*4, u*1.8, u*0.9, u*1.8] : st.dash === 'dot' ? [0, Math.max(lw*2.2, u*1.6)] : []); path(); L.stroke(); L.setLineDash([]);
+  if (useMask) { L.globalCompositeOperation = 'destination-out'; L.drawImage(mask, 0, 0, W, H); L.globalCompositeOperation = 'source-over'; }
+  c.save(); c.globalAlpha = st.lineA; c.drawImage(layer, 0, 0); c.restore(); return out; }
+
+// ---------- 5. look ----------
+const LINE_SW = ['#2F7A56','#eb1e1e','#ff7a00','#F7C948','#00c2ff','#2a5bff','#ffffff','#111111'];
+const FILL_SW = ['#F7C948','#7bed9f','#ff8c42','#ff4d4d','#48dbfb','#a29bfe','#ffffff','#ff6ec7'];
+let look = 0;
+function swatches(el, list, key, inputId, hexId){ list.forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.title = c; b.setAttribute('aria-label', c); b.onclick = () => setColor(key, c, inputId, hexId); el.appendChild(b); }); }
+function setColor(key, c, inputId, hexId){ if (!/^#[0-9a-f]{6}$/i.test(c)) return; st[key] = c; $(inputId).value = c; $(hexId).value = c;
+  const sw = key === 'lineColor' ? $('swLine') : key === 'innerColor' ? $('swInner') : $('swFill'); [...sw.children].forEach(b => b.classList.toggle('on', b.title.toLowerCase() === c.toLowerCase())); drawBig(); }
+swatches($('swLine'), LINE_SW, 'lineColor', 'lineColor', 'lineHex'); swatches($('swInner'), LINE_SW, 'innerColor', 'innerColor', 'innerHex'); swatches($('swFill'), FILL_SW, 'fillColor', 'fillColor', 'fillHex');
+$('lineColor').oninput = e => setColor('lineColor', e.target.value, 'lineColor', 'lineHex'); $('fillColor').oninput = e => setColor('fillColor', e.target.value, 'fillColor', 'fillHex');
+$('lineHex').onchange = e => setColor('lineColor', e.target.value.trim(), 'lineColor', 'lineHex'); $('fillHex').onchange = e => setColor('fillColor', e.target.value.trim(), 'fillColor', 'fillHex');
+setColor('lineColor', st.lineColor, 'lineColor', 'lineHex'); setColor('fillColor', st.fillColor, 'fillColor', 'fillHex');
+$('lineW').oninput = e => { st.lineW = +e.target.value; $('lineWv').textContent = st.lineW.toFixed(2) + '%'; drawBig(); };
+$('lineA').oninput = e => { st.lineA = e.target.value/100; $('lineAv').textContent = e.target.value + '%'; drawBig(); };
+$('fillA').oninput = e => { st.fillA = e.target.value/100; $('fillAv').textContent = e.target.value + '%'; drawBig(); };
+const seg = (id, key) => [...$(id).children].forEach(el => el.onclick = () => { st[key] = el.dataset.m; [...$(id).children].forEach(x => x.classList.toggle('on', x === el)); drawBig(); });
+seg('cover', 'cover'); seg('blend', 'fillMode');
+seg('dash', 'dash');
+// Lines between parcels (only shown when the order has adjoining parcels): on by default, same color as the outline.
+seg('innerOn', 'innerOn'); [...$('innerOn').children].forEach(el => el.addEventListener('click', () => { st.innerOn = el.dataset.m === 'on'; $('innerColorBox').hidden = !st.innerOn; drawBig(); }));
+$('innerMatch').onchange = e => { st.innerMatch = e.target.checked; $('innerPick').hidden = st.innerMatch; if (!st.innerMatch && st.innerColor.toLowerCase() === st.lineColor.toLowerCase()) setColor('innerColor', '#ffffff', 'innerColor', 'innerHex'); else drawBig(); };
+$('innerColor').oninput = e => setColor('innerColor', e.target.value, 'innerColor', 'innerHex'); $('innerHex').onchange = e => setColor('innerColor', e.target.value.trim(), 'innerColor', 'innerHex');
+setColor('innerColor', st.innerColor, 'innerColor', 'innerHex');
+[...$('blend').children].forEach(el => el.addEventListener('click', () => { $('hatchBox').hidden = st.fillMode !== 'hatch'; }));
+$('hatchGap').oninput = e => { st.hatchGap = +e.target.value; $('hatchGapv').textContent = st.hatchGap < 1.4 ? 'Tight' : st.hatchGap < 2.6 ? 'Medium' : 'Wide'; drawBig(); };
+function buildLook(){ $('innerBox').hidden = !(order.groups || []).some(g => g.members.length > 1); const s = $('strip'); s.innerHTML = ''; order.photos.forEach((p, i) => { const d = document.createElement('div'); d.className = 'th' + (i === look ? ' active' : ''); const im = document.createElement('img'); im.src = p.img.src; im.alt = p.label || p.name; d.appendChild(im); if (p.label) { const n = document.createElement('span'); n.className = 'n'; n.textContent = p.label; d.appendChild(n); } d.onclick = () => { look = i; buildLook(); }; s.appendChild(d); }); drawBig(); }
+function drawBig(){ if (order.step !== 5) return; const p = order.photos[look]; if (!p) return; const big = $('big'); const W = Math.min(1600, p.img.naturalWidth), H = Math.round(W*p.img.naturalHeight/p.img.naturalWidth);
+  const out = renderFinal(p.img, p.pts, p.mask, W, H); big.width = W; big.height = H; big.getContext('2d').drawImage(out, 0, 0); }
+// Create: the look (and pins) are locked in. Any later change to them is a $2 change fee (decision 10/12/2026).
+const FEE = LO.CHANGE_FEE ?? 2;
+const snapshot = () => JSON.stringify([st, order.photos.map(p => (p.pts || []).map(q => [Math.round(q.x), Math.round(q.y)]))]);
+const unpaidFees = () => Math.max(0, (order.changes || 0) * FEE - (order.feesPaid || 0));
+$('agree5').onchange = () => { $('go5').disabled = !$('agree5').checked; };
+$('go5').onclick = () => { if (!$('agree5').checked) return; const snap = snapshot();
+  if (order.freeFix) { order.freeFix = false; order.snap = snap; }
+  if (order.created && snap !== order.snap) { if (!confirm(`You changed the look or the pins after creating the order. That's a $${FEE} change fee. Save the change?`)) return; order.changes = (order.changes || 0) + 1; if (order.final) order.final = false; }
+  order.created = true; order.snap = snap; $('go5').textContent = 'Save and continue'; go(6); };
+// Back to the pins from the Look step: pins stay where they were; the agent adjusts and re-runs (re-carry is local math, no AI cost).
+$('back5').onclick = () => { order.fixing = -1; cur = order.pinIdx || 0; $('acts3').hidden = false; $('acts3fix').hidden = true; go(3); };
+
+// ---------- 6. pay + download ----------
+function watermark(c){ const x = c.getContext('2d'); x.save(); x.globalAlpha = 0.28; x.fillStyle = '#fff'; x.font = `bold ${Math.round(c.width/9)}px system-ui,sans-serif`; x.translate(c.width/2, c.height/2); x.rotate(-0.4);
+  for (let y = -c.height; y < c.height; y += c.height/2.2) for (let xx = -c.width; xx < c.width; xx += c.width/1.6) x.fillText('PREVIEW', xx, y); x.restore(); return c; }
+// Plat maps for a photo order: built once per address + outline from the county lot lines, rebuilt if either changes.
+function platsFor(){ if (!order.addr || !LO.sat || !LO.sat.platMaps) return null; const k = order.addr + '|' + JSON.stringify(order.geoRing || []);
+  if (order.platsKey === k) return order.plats || null; if (order.platsBusy === k) return null; order.platsBusy = k;
+  LO.sat.platMaps(order).then(r => { if (order.platsBusy !== k) return; order.plats = r; order.platsKey = k; order.platsBusy = null; if (order.step === 6) buildPay(); })
+    .catch(e => { console.warn('plat maps', e); if (order.platsBusy === k) { order.plats = []; order.platsKey = k; order.platsBusy = null; } }); return null; }
+const platList = () => isSat() ? [] : (order.plats || []);
+function buildPay(){ const g = $('grid6'); g.innerHTML = ''; const k = order.photos.length, pr = orderPrice();
+  if (order.cancelled) return showCancelled(); const capMode = order.paid && order.addons.captions; g.classList.toggle('capgrid', capMode); $('capBar').hidden = !capMode; if (capMode) drawCapBar();
+  order.photos.forEach((p, i) => { if (capMode) return g.appendChild(capCard(p, i)); const d = document.createElement('div'); d.className = 'th'; d.style.animationDelay = (i*40) + 'ms'; const c = thumbCanvas(p, 800); d.appendChild(order.final ? c : watermark(c)); const n = document.createElement('span'); n.className = 'n'; n.textContent = i+1; d.appendChild(n); d.onclick = () => openLb(i); d.title = 'Click to enlarge'; g.appendChild(d); });
+  // Both plat maps ride along with every photo order (the satellite kit draws its own): county lot lines, no look applied, free.
+  if (!isSat()) { const P = platsFor(); if (P) P.forEach((p, j) => { const d = document.createElement('div'); d.className = 'th'; d.style.animationDelay = ((order.photos.length + j) * 40) + 'ms';
+    const c = document.createElement('canvas'); c.width = 800; c.height = Math.round(800 * p.img.naturalHeight / p.img.naturalWidth); c.getContext('2d').drawImage(p.img, 0, 0, c.width, c.height);
+    d.appendChild(order.final ? c : watermark(c)); const n = document.createElement('span'); n.className = 'n'; n.textContent = p.label; n.style.color = '#1E2A22'; n.style.textShadow = '0 0 3px #fff'; d.appendChild(n); d.title = p.label + ' · included with every order'; g.appendChild(d); }); }
+  { const p0 = order.photos[0]; if (p0) { const W = p0.img.naturalWidth, H = p0.img.naturalHeight; $('p6').innerHTML = order.final ? `Click any photo to enlarge. Downloads are ${W.toLocaleString()} × ${H.toLocaleString()} px, full resolution.` : `Previews are watermarked, about 800 px wide. Click any photo to enlarge. The files you download are <b>${W.toLocaleString()} × ${H.toLocaleString()} px</b>${isSat() ? '' : ' (your originals\' full resolution)'} and unlock when you finalize.`; } }
+  $('bl1').textContent = isSat() ? `Listing upgrade · ${k} images, outlined and reviewed` : `${k} photo${k>1?'s':''}, outlined and reviewed`; $('bl2').textContent = fmt(basePrice()); buildAddons(); roll($('total'), pr);
+  { const x = extraParcels(); $('blParcels').hidden = !x; $('blParcelsL').textContent = `${x} extra parcel${x > 1 ? 's' : ''} ($${LO.ADDON_PARCEL} each)`; $('blParcelsV').textContent = fmt(x * LO.ADDON_PARCEL); }
+  const fees = (order.changes || 0) * FEE; $('blFee').hidden = !fees; $('blFeeV').textContent = fmt(fees); $('blFeeL').textContent = `${order.changes} change${order.changes > 1 ? 's' : ''} after creating ($${FEE} each)`;
+  const owe = order.paid ? unpaidFees() : 0, capsOk = capFinal();
+  $('pay').hidden = order.paid; $('payterms').hidden = order.paid; $('finBox').hidden = !order.paid || order.final; $('payFee').hidden = !owe; $('payFee').textContent = `Pay the $${owe} change fee`;
+  $('fin').disabled = !!owe || !capsOk; $('finNote').textContent = owe ? 'Pay the change fee, then finalize.' : !capsOk ? 'Approve your captions (or send your one round of changes), then finalize.' : 'Finalizing unlocks the full-resolution files. After this, changes are $' + FEE + ' each and the order can no longer be refunded.';
+  $('cancelOrder').hidden = !!order.wasFinal;
+  $('dlAll').hidden = !order.final; $('apptKit').hidden = !order.final; $('mlsBox').hidden = !(order.final && order.addons.mlsUpload); $('mlsCapNote').hidden = !order.addons.captions;
+  $('paynote').textContent = order.final ? 'Finalized. Full-resolution files are ready; downloads start one at a time.' : order.paid ? 'Paid. Look over every photo' + (order.addons.captions ? ' and caption' : '') + ', then finalize to unlock the full-resolution files.' : 'Card checkout opens at launch. For this preview build, "Pay" stands in for the card charge.'; }
+function roll(el, n){ if (reduced) { el.textContent = fmt(n); return; } const from = parseFloat(el.textContent.replace(/[^\d.]/g,'')) || 0, t0 = performance.now(); const run = () => { const t = Math.min(1, (performance.now()-t0)/260); el.textContent = t < 1 ? '$' + Math.round(from + (n-from)*(1-Math.pow(1-t,3))) : fmt(n); if (t < 1) requestAnimationFrame(run); }; run(); }
+$('back6').onclick = () => go(5);
+function buildAddons(){ if (isSat()) order.addons.enhance = false; if (!LO.SHOW_SPOT) order.addons.spot = false; if (!LO.SHOW_MAPS) order.addons.maps = []; const radii = radiiFor(); order.addons.maps = order.addons.maps.filter(r => radii.includes(r)); const dis = order.paid ? 'disabled' : ''; const A = order.addons;
+  const why = order.density === 'rural' ? 'Out here the nearest stops are a few miles off, so we start wider.' : order.density === 'suburban' ? 'For this area the first mile is mostly homes, so we start at 3 miles.' : 'This lot has plenty within a mile, so we start close in.';
+  const n = order.photos.length;
+  $('addons').innerHTML = `
+  ${LO.SHOW_MAPS ? `  <div class="addon ${A.maps.length?'on':''}" id="adMap">
+    <div class="art map" aria-hidden="true">
+      <span class="rd" style="left:-5%;top:48%;width:110%;transform:rotate(-4deg)"></span><span class="rd" style="left:62%;top:-10%;height:120%;width:5px;transform:rotate(14deg)"></span><span class="rd" style="left:-5%;top:76%;width:110%;transform:rotate(2deg)"></span>
+      <span class="lot"></span><span class="tag">PROPERTY LOCATION</span>
+      <span class="card" style="left:8%;top:14%;width:22%"><i style="background:#d7262c"></i><i style="background:#1d4fa3"></i><i style="background:#f2b300"></i><i style="background:#1f8a4c"></i></span>
+      <span class="card" style="left:70%;top:58%;width:24%"><i style="background:#c8102e"></i><i style="background:#ffd400"></i><i style="background:#00539b"></i><i style="background:#e4572e"></i><i style="background:#2a9d8f"></i><i style="background:#7b2d8b"></i></span>
+      <span class="card" style="left:30%;top:66%;width:18%"><i style="background:#ff6a00"></i><i style="background:#0a66c2"></i></span>
+      <span class="lbl" style="left:14%;top:44%">PARK ROAD · 12,170 VPD</span><span class="lbl" style="left:40%;top:78%">WESTERN AVE</span>
+    </div>
+    <div class="body"><h3>Area maps <small>$5 per map</small></h3>
+      <p>Zoomed-out aerials with your property flagged, the main roads labeled with traffic counts, and the stores, schools and landmarks around it called out with their logos. Sized for the MLS gallery.</p>
+      <p class="why">${why}</p>
+      <div class="opts">${radii.map(r => `<label><input type="checkbox" data-r="${r}" ${A.maps.includes(r)?'checked':''} ${dis}> <span>Up to ${r} mile${r>1?'s':''} out</span><small>${fmt(LO.ADDON_MAP)}</small></label>`).join('')}</div>
+    </div>
+  </div>` : ''}
+  ${isSat() ? '' : `  <div class="addon ${A.enhance?'on':''}" id="adEnh">
+    <div class="art" aria-hidden="true" style="background:linear-gradient(100deg,#4a5a3a 0 50%,#5f8a3c 50% 100%)"><span class="lbl" style="left:10%;top:44%">BEFORE</span><span class="lbl" style="left:62%;top:44%">AFTER</span></div>
+    <div class="body"><h3>Photo enhancement <small>whole order, not per photo</small></h3>
+      <p>Each photo comes back like it was shot on a perfect day: even daylight, lifted shadows, natural color, dead grass brought to a realistic green, driveways lightly cleaned. The original photo with adjustments, never a re-rendering: nothing added, nothing removed, no sky swaps.</p>
+      <p class="why">Light-handed and consistent across the set. Every enhanced photo is checked before delivery, same as the outlines.</p>
+      <div class="opts"><label><input type="checkbox" data-k="enhance" ${A.enhance?'checked':''} ${dis}> <span>Enhance all ${n} photo${n>1?'s':''}</span><small>${fmt(LO.ADDON_ENHANCE)}</small></label></div>
+    </div>
+  </div>`}
+  <div class="addon ${A.captions?'on':''}" id="adCap">
+    <div class="art cap" aria-hidden="true">
+      <div class="ph"><i></i><s class="w"></s><s class="n"></s></div><div class="ph"><i class="b"></i><s class="w"></s><s class="n"></s></div>
+      <div class="ph"><i class="c"></i><s class="w"></s><s class="n"></s></div><div class="ph"><i class="d"></i><s class="w"></s><s class="n"></s></div>
+      <span class="pill">MLS READY</span>
+    </div>
+    <div class="body"><h3>Photo descriptions <small>whole order, not per photo</small></h3>
+      <p>A caption for every photo, 300 to 500 characters each, with a round of revisions included (one price for the whole order: $5 up to 10 photos, $7.50 for 11 to 40), in the order your gallery runs. We look up the neighborhood ourselves from the address: parks and pools, schools, shopping, dining and drive times, worked in where they belong.</p>
+      <p class="why">Nothing to upload. The address is all we need.</p>
+      <div class="opts"><label><input type="checkbox" data-k="captions" ${A.captions?'checked':''} ${dis}> <span>Write captions for all ${n} photo${n>1?'s':''}</span><small>${fmt(captionPrice())}</small></label>
+        <div class="fields">
+          <div class="capsrc" role="radiogroup" aria-label="What to write from">
+            <label><input type="radio" name="capSrc" value="address" ${A.capSrc!=='listing'?'checked':''} ${dis}> <span><b>Write it all from the address</b><small>We find everything nearby. Nothing else needed.</small></span></label>
+            <label><input type="radio" name="capSrc" value="listing" ${A.capSrc==='listing'?'checked':''} ${dis}> <span><b>Also use my listing</b><small>${order.harLink ? 'We have your HAR link.' : 'Paste your HAR link on the Photos step, or drop the MLS printout here.'}</small></span></label>
+          </div>
+          <label>Anything you want mentioned <small class="opt">optional</small><textarea id="keyItems" placeholder="HEB and lots of shopping on Gessner, walk to the neighborhood pool" ${dis}>${A.keyItems}</textarea></label>
+          ${A.capSrc === 'listing' && !order.harLink ? `<label>MLS printout (PDF or image), if the listing isn't active <input type="file" id="mlsPrint" accept=".pdf,image/*" ${dis}></label>` : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="addon ${A.mlsUpload?'on':''}" id="adMls">
+    <div class="art" aria-hidden="true" style="background:#2b3f22"><span class="tag" style="top:40%">UPLOADED TO YOUR LISTING</span></div>
+    <div class="body"><h3>We upload it for you <small>flat</small></h3>
+      <p>You sign in to your MLS in your own Chrome, then click once to let us drive that tab. The Lot Outline helper adds the finished photos${A.captions ? ' and captions' : ''} to your listing in order, then you look them over and click Certify and Save. Nothing else is touched.</p>
+      <p class="why">We never see or store your MLS login. Everything happens in your browser, in your session, and you can stop it any time.</p>
+      <div class="opts"><label><input type="checkbox" data-k="mlsUpload" ${A.mlsUpload?'checked':''} ${dis}> <span>Upload to my MLS listing</span><small>${fmt(LO.ADDON_MLS_UPLOAD)}</small></label>
+        <div class="fields">
+          <ol class="mlssteps"><li><b>Add the Lot Outline helper to Chrome.</b> One click, one time.</li><li><b>Sign in to your MLS</b> and open this listing, like you normally would.</li><li><b>Click "Approve upload"</b> on your download page. The helper puts everything on the listing while you watch.</li></ol>
+          <label class="terms"><input type="checkbox" id="mlsAuth" ${A.mlsAuth?'checked':''} ${dis}> <span>I'm the listing agent. When I click Approve, Lot Outline may add these photos${A.captions ? ' and captions' : ''} to this listing in my signed-in Chrome tab, and nothing else.</span></label>
+          ${A.mlsUpload && !A.mlsAuth ? '<p class="warn">Check the box so we can upload when you approve.</p>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>
+  ${LO.SHOW_SPOT ? `  <div class="addon ${A.spot?'on':''}" id="adSpot">
+    <div class="art spot" aria-hidden="true">
+      <div class="pg a"><b></b><i></i><s></s><s class="n"></s><s></s></div>
+      <div class="pg b"><b></b><i class="w"></i><s></s><s class="n"></s><s></s><s class="n"></s></div>
+      <div class="pg c"><b></b><i></i><s></s><s class="n"></s><s></s></div>
+    </div>
+    <div class="body"><h3>Neighborhood Spotlight <small>booklet</small></h3>
+      <p>A printed-quality booklet for buyers touring the home: the neighborhood, its schools, parks, dining and commute, with sourced facts and independent reviews. You get a print PDF, an online PDF, and a gallery image that links it from the listing.</p>
+      <p class="why">Buyers take it home. Agents keep asking where to get one.</p>
+      <div class="opts"><label><input type="checkbox" data-k="spot" ${A.spot?'checked':''} ${dis}> <span>Add the Spotlight booklet</span><small>${fmt(LO.ADDON_SPOT)}</small></label></div>
+    </div>
+  </div>` : ''}`;
+  $('addons').querySelectorAll('input[data-r]').forEach(cb => cb.onchange = e => { const r = +cb.dataset.r; A.maps = e.target.checked ? [...A.maps, r].sort((a,b)=>a-b) : A.maps.filter(x => x !== r); buildAddons(); updPill(); roll($('total'), orderPrice()); });
+  $('addons').querySelectorAll('input[data-k]').forEach(cb => cb.onchange = e => { A[cb.dataset.k] = e.target.checked; buildAddons(); buildQuick(); updPill(); roll($('total'), orderPrice()); });
+  // Text fields keep their value in the order without a rebuild; the auth box rebuilds so the warning clears.
+  const keep = (id, k) => { const el = $(id); if (el) el.oninput = () => { A[k] = el.value; }; };
+  keep('keyItems', 'keyItems');
+  $('addons').querySelectorAll('input[name=capSrc]').forEach(r => r.onchange = () => { A.capSrc = r.value; buildAddons(); });
+  if ($('mlsAuth')) $('mlsAuth').onchange = e => { A.mlsAuth = e.target.checked; buildAddons(); };
+  if ($('mlsPrint')) $('mlsPrint').onchange = e => { A.mlsPrintFile = e.target.files[0] || null; };
+  const lines = [...A.maps.map(r => [`Area map, ${r} mi`, LO.ADDON_MAP]),
+    ...(A.enhance ? [[`Photo enhancement, all ${n} photo${n>1?'s':''}`, LO.ADDON_ENHANCE]] : []),
+    ...(A.captions ? [[`Photo descriptions, all ${n} photo${n>1?'s':''}`, captionPrice()]] : []),
+    ...(A.mlsUpload ? [['Upload to your MLS listing', LO.ADDON_MLS_UPLOAD]] : []),
+    ...(A.spot ? [['Neighborhood Spotlight', LO.ADDON_SPOT]] : [])];
+  $('blAddons').innerHTML = lines.map(([t, v]) => `<div class="line"><span>${t}</span><span>${fmt(v)}</span></div>`).join('');
+  // The upload needs a login and the authorization; hold the Pay button until they're in.
+  const mlsOk = !A.mlsUpload || A.mlsAuth;
+  $('pay').disabled = !mlsOk; }
+// Look step: the two per-photo add-ons as quick toggles, mirrored in the Pay step cards.
+function buildQuick(){ const q = $('quick5'); if (!q) return; const A = order.addons, n = order.photos.length, dis = order.paid ? 'disabled' : '';
+  if (isSat()) A.enhance = false;
+  q.innerHTML = `${isSat() ? '' : `<label><input type="checkbox" data-k="enhance" ${A.enhance?'checked':''} ${dis}> <span>Enhance all ${n} photo${n>1?'s':''}</span><small>${fmt(LO.ADDON_ENHANCE)}</small></label>`}
+    <label><input type="checkbox" data-k="captions" ${A.captions?'checked':''} ${dis}> <span>Write captions for all ${n} photo${n>1?'s':''}</span><small>${fmt(captionPrice())}</small></label>`;
+  q.querySelectorAll('input').forEach(cb => cb.onchange = e => { A[cb.dataset.k] = e.target.checked; buildQuick(); updPill(); });
+}
+// lightbox: click a preview to enlarge, arrows / keys to move between photos
+let lbI = 0;
+function openLb(i){ lbI = i; drawLb(); $('lb').hidden = false; document.body.style.overflow = 'hidden'; }
+document.querySelectorAll('.kit .shot').forEach(b => b.onclick = () => { $('kitlbImg').src = b.dataset.full; $('kitlbImg').alt = b.querySelector('img').alt; $('kitlbT').textContent = b.closest('.it').querySelector('b').textContent; $('kitlb').hidden = false; });
+$('kitlb').onclick = () => { $('kitlb').hidden = true; }; document.addEventListener('keydown', e => { if (e.key === 'Escape') $('kitlb').hidden = true; });
+function closeLb(){ $('lb').hidden = true; document.body.style.overflow = ''; }
+function drawLb(){ const p = order.photos[lbI]; if (!p) return; const W = Math.min(1600, p.img.naturalWidth), H = Math.round(W*p.img.naturalHeight/p.img.naturalWidth);
+  const out = renderFinal(p.img, p.pts, p.mask, W, H); if (!order.final) watermark(out); const c = $('lbC'); c.width = W; c.height = H; c.getContext('2d').drawImage(out, 0, 0);
+  $('lbCap').innerHTML = `<b>${p.label || ('Photo ' + (lbI+1))}</b> of ${order.photos.length} · ${order.final ? 'full resolution ready to download' : 'watermarked preview · final ' + p.img.naturalWidth.toLocaleString() + ' × ' + p.img.naturalHeight.toLocaleString() + ' px'}`; }
+$('lbX').onclick = closeLb; $('lbC').onclick = closeLb; $('lb').onclick = e => { if (e.target === $('lb')) closeLb(); };
+$('lbPrev').onclick = e => { e.stopPropagation(); lbI = (lbI - 1 + order.photos.length) % order.photos.length; drawLb(); };
+$('lbNext').onclick = e => { e.stopPropagation(); lbI = (lbI + 1) % order.photos.length; drawLb(); };
+document.addEventListener('keydown', e => { if ($('lb').hidden) return; if (e.key === 'Escape') closeLb(); if (e.key === 'ArrowLeft') $('lbPrev').click(); if (e.key === 'ArrowRight') $('lbNext').click(); });
+$('pay').onclick = () => { order.paid = true; order.feesPaid = (order.changes || 0) * FEE; buildPay(); if (order.addons.captions && !order.cap) writeCaptions(); };
+$('payFee').onclick = () => { order.feesPaid = (order.changes || 0) * FEE; buildPay(); };
+$('fin').onclick = () => { if (!confirm('Finalize the order? The full-resolution files unlock now. After this the order can\'t be refunded, and changes are $' + FEE + ' each.')) return; order.final = true; order.wasFinal = true; order.finalizedAt = order.finalizedAt || new Date().toISOString(); buildPay(); saveNow(); };
+$('cancelOrder').onclick = () => { const amt = fmt(orderPrice()); if (!confirm(`Cancel this order? Your ${amt} comes back to your card in full, usually within 5 to 10 business days.`)) return; order.cancelled = true; buildPay(); saveNow(); };
+function showCancelled(){ $('capBar').hidden = true; const g = $('grid6'); g.classList.remove('capgrid'); g.innerHTML = '<div class="cancelled"><h2 style="margin:0 0 6px">Order canceled</h2><p style="margin:0">Your full refund is on its way to your card, usually within 5 to 10 business days. Nothing was charged for the canceled order.</p><p style="margin:12px 0 0"><a class="btn" href="app.html">Start a new order</a></p></div>';
+  document.querySelector('#s6 .bill').hidden = true; document.querySelector('#s6 .more').hidden = true; $('back6').hidden = true; }
+
+// ---- Captions: drafted after payment, shown under each photo, one round of change requests, then final ----
+// order.cap = { state: 'writing'|'draft'|'revising'|'final', error }. Each photo keeps p.caption and p.capNote.
+// Only final captions go into README.txt and the MLS upload.
+const capImage = (p, w = 1024, q = 0.85) => thumbCanvas(p, w).toDataURL('image/jpeg', q).split(',')[1];
+const capFinal = () => !order.addons.captions || (order.cap && order.cap.state === 'final');
+// The writer runs in stages, each its own request: look up what's nearby -> plan the whole gallery -> write in small
+// batches (each sees every caption already written) -> fact check every photo against its caption -> edit the set.
+async function capCall(body){ const { data, error } = await LO.sb.functions.invoke('captions', { body });
+  if (error || !data || data.error) { let msg = (data && data.error) || (error && error.message) || 'failed';
+    try { const j = error && error.context && await error.context.json(); if (j && (j.error || j.message)) msg = j.error || j.message; } catch (e) {}
+    throw new Error(msg); }
+  return data; }
+const capStage = (stage, done, total) => { order.cap = { ...order.cap, stage, done, total }; drawCapBar(); };
+const capBase = () => ({ total: order.photos.length, address: order.addr, keyItems: order.addons.keyItems || '', kit: isSat() });
+const capList = () => order.photos.map((p, i) => p.caption ? { i, text: p.caption } : null).filter(Boolean);
+async function capContext(){ if (order.capCtx) return order.capCtx;
+  const P = order.parcel || {}, lot = [P.dims, P.cad, P.hcad ? 'tax ID ' + P.hcad : ''].filter(x => x && !/matched by location/.test(x)).join(', ');
+  let shops = []; try { shops = await LO.sat.shopsNear(order.geo); } catch (e) {}
+  order.capCtx = await capCall({ mode: 'context', shops, geo: order.geo || null, address: order.addr, harLink: order.addons.capSrc === 'listing' ? (order.harLink || '') : '', lot }); return order.capCtx; }
+async function capPlan(ctx){ if (order.capPlan) return order.capPlan;
+  try { order.capPlan = (await capCall({ ...capBase(), mode: 'plan', ctx, photos: order.photos.map((p, i) => ({ i, name: p.name, image: capImage(p, 512, 0.7) })) })).plan; }
+  catch (e) { console.warn('caption plan', e); order.capPlan = { photos: [] }; }   // writing still works without a plan, just less coordinated
+  return order.capPlan; }
+// Write the given photos, then fact check and edit them against the whole set. Returns the photos that still have no caption.
+async function capRun(idx){ const errs = []; let reason = '';
+  capStage('Looking up what\'s nearby…', 0, idx.length); const ctx = await capContext();
+  capStage('Looking over the whole gallery…', 0, idx.length); const plan = await capPlan(ctx);
+  for (let k = 0; k < idx.length; k += 4) { const chunk = idx.slice(k, k + 4); capStage('Writing captions…', k, idx.length);
+    try { const d = await capCall({ ...capBase(), mode: 'write', ctx, plan, prior: capList().filter(c => !chunk.includes(c.i)), photos: chunk.map(i => ({ i, name: order.photos[i].name, image: capImage(order.photos[i]) })) });
+      d.captions.forEach(c => { order.photos[c.i].caption = c.text; }); (d.errors || []).forEach(e => { errs.push(e.i); reason = reason || e.error; }); }
+    catch (e) { chunk.forEach(i => errs.push(i)); reason = reason || e.message; } }
+  const done = idx.filter(i => order.photos[i].caption && !errs.includes(i));
+  for (let round = 0; round < 3 && done.length; round++) {   // fact check -> fix -> check the fixes -> fix -> check again
+    let flags = []; const check = round ? [...new Set(order.capLastFix || [])] : done;
+    for (let k = 0; k < check.length; k += 10) { capStage('Checking every fact…', k, check.length);
+      try { flags.push(...(await capCall({ mode: 'verify', ctx, captions: capList(), photos: check.slice(k, k + 10).map(i => ({ i, image: capImage(order.photos[i], 512, 0.7) })) })).flags); } catch (e) { console.warn('caption verify', e); } }
+    const targets = round ? [...new Set(flags.map(f => f.i))] : done;   // first round edits every new caption for repeats; later rounds only the flagged
+    order.capLastFix = [];
+    for (let k = 0; k < targets.length; k += 10) { capStage(round ? 'Fixing what didn\'t check out…' : 'Editing so no two read alike…', k, targets.length);
+      try { const d = await capCall({ mode: 'polish', ctx, plan, captions: capList(), targets: targets.slice(k, k + 10), flags });
+        d.captions.forEach(c => { order.photos[c.i].caption = c.text; order.capLastFix.push(c.i); }); } catch (e) { console.warn('caption polish', e); } }
+    if (!order.capLastFix.length) break; }
+  return { missing: [...new Set(errs)], reason }; }
+const capErr = (n, reason, again) => n ? `${n} caption${n > 1 ? 's' : ''} ${again ? 'still ' : ''}didn't come through (${reason || 'no reason given'}). Click "Try those again".` : '';
+async function writeCaptions(){ order.cap = { state: 'writing', done: 0 }; buildPay();
+  let r; try { r = await capRun(order.photos.map((_, i) => i)); } catch (e) { r = { missing: order.photos.map((_, i) => i).filter(i => !order.photos[i].caption), reason: e.message }; }
+  order.cap = { state: 'draft', error: capErr(r.missing.length, r.reason), missing: r.missing }; buildPay(); }
+async function retryMissing(){ const miss = order.cap.missing || []; order.cap = { state: 'writing', done: 0 }; buildPay();
+  let r; try { r = await capRun(miss); } catch (e) { r = { missing: miss.filter(i => !order.photos[i].caption), reason: e.message }; }
+  order.cap = { state: 'draft', error: capErr(r.missing.length, r.reason, true), missing: r.missing }; buildPay(); }
+async function reviseCaptions(){ const asks = order.photos.map((p, i) => (p.capNote || '').trim() ? i : -1).filter(i => i >= 0); if (!asks.length) return;
+  order.cap = { state: 'revising', done: 0, total: asks.length }; buildPay(); const errs = []; let reason = '';
+  try { const ctx = await capContext();
+    for (let k = 0; k < asks.length; k += 5) { const chunk = asks.slice(k, k + 5); capStage('Making your changes…', k, asks.length);
+      try { const d = await capCall({ mode: 'revise', ctx, plan: order.capPlan || { photos: [] }, captions: capList(), photos: chunk.map(i => { const p = order.photos[i]; return { i, image: capImage(p), current: p.caption || '', note: p.capNote }; }) });
+        d.captions.forEach(c => { order.photos[c.i].caption = c.text; order.photos[c.i].revised = true; }); (d.errors || []).forEach(e => { errs.push(e.i); reason = reason || e.error; }); }
+      catch (e) { chunk.forEach(i => errs.push(i)); reason = reason || e.message; } }
+    const changed = asks.filter(i => !errs.includes(i)); let flags = [];
+    if (changed.length) { capStage('Checking every fact…', 0, changed.length);
+      try { flags = (await capCall({ mode: 'verify', ctx, captions: capList(), photos: changed.map(i => ({ i, image: capImage(order.photos[i], 512, 0.7) })) })).flags; } catch (e) {}
+      const fix = [...new Set(flags.map(f => f.i))];
+      if (fix.length) { try { const d = await capCall({ mode: 'polish', ctx, plan: order.capPlan || { photos: [] }, captions: capList(), targets: fix, flags }); d.captions.forEach(c => { order.photos[c.i].caption = c.text; }); } catch (e) {} } }
+  } catch (e) { reason = reason || e.message; asks.forEach(i => errs.includes(i) || errs.push(i)); }
+  order.photos.forEach(p => { if ((p.capNote || '').trim()) p.lastNote = p.capNote.trim(); p.capNote = ''; p.capOk = true; });
+  order.cap = { state: 'final', error: errs.length ? `${errs.length} change${errs.length > 1 ? 's' : ''} didn't go through (${reason || 'no reason given'}), so those captions kept their first draft. You can edit any caption yourself below.` : '' }; buildPay(); }
+function drawCapBar(){ const b = $('capBar'), c = order.cap || { state: 'writing', done: 0 }, n = order.photos.length;
+  const asks = order.photos.filter(p => (p.capNote || '').trim()).length;
+  if (c.state === 'writing' || c.state === 'revising') { const tot = c.total || n, stage = c.stage || (c.state === 'writing' ? 'Getting started…' : 'Making your changes…');
+    b.innerHTML = `<div><b>${stage}</b><p>${c.state === 'writing' ? 'We look up what the property is near, read the whole gallery, write each caption, then check every fact and edit the set so no two read alike. This takes a few minutes; you can keep looking at your photos.' : `${c.done || 0} of ${tot} done.`}</p></div><div class="capprog"><i style="width:${Math.max(4, 100 * (c.done || 0) / tot)}%"></i></div>`; return; }
+  if (c.state === 'draft') {
+    b.innerHTML = `<div><b>Your photos and captions are ready to review</b><p>Check each photo and its caption. If something's off, type it in the box under that photo, like "the line misses the back fence" or "mention it's a corner lot". You get one round of changes for photos and captions, so put them all in before you send. Happy with one? Approve it, or approve them all at once.</p>${c.error ? `<p class="caperr">${c.error}</p>` : ''}</div>
+      <div class="capacts">${(c.missing || []).length ? '<button class="btn" id="capRetry">Try those again</button>' : ''}<button class="btn" id="capSend" ${asks ? '' : 'disabled'}>Send ${asks || ''} change${asks === 1 ? '' : 's'} (your one round)</button><button class="btn primary" id="capOk">Approve all</button></div>`;
+    $('capSend').onclick = () => { if (confirm(`Send changes for ${asks} caption${asks > 1 ? 's' : ''}? This uses your one round of revisions. After this you can still edit any caption yourself.`)) reviseCaptions(); };
+    $('capOk').onclick = () => { if (asks && !confirm('You typed changes that haven\'t been sent. Approve the captions as they are anyway?')) return; order.photos.forEach(p => { p.capNote = ''; p.capOk = true; }); order.cap = { state: 'final' }; buildPay(); };
+    if ($('capRetry')) $('capRetry').onclick = retryMissing; return; }
+  b.innerHTML = `<div><b>Photos and captions approved</b><p>Every photo goes into your ZIP download at full resolution, and the captions go into the README.txt file that comes with it${order.addons.mlsUpload ? ', and onto your listing with the photos' : ''}. You can still fix a word yourself in any caption below.</p>${c.error ? `<p class="caperr">${c.error}</p>` : ''}</div>`; }
+const DONE_NOTE = 'This photo goes into your ZIP download at full resolution, and its caption goes into the README.txt file that comes with it.';
+function capCard(p, i){ const d = document.createElement('div'); d.className = 'capcard'; const c = order.cap || {};
+  const th = document.createElement('div'); th.className = 'th'; { const tc = thumbCanvas(p, 800); th.appendChild(order.final ? tc : watermark(tc)); } const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1; th.appendChild(n); th.onclick = () => openLb(i); d.appendChild(th);
+  const box = document.createElement('div'); box.className = 'capbody';
+  if (c.state === 'writing' && !p.caption) { box.innerHTML = '<p class="capwait">Writing…</p>'; d.appendChild(box); return d; }
+  const txt = document.createElement('textarea'); txt.className = 'captext'; txt.value = p.caption || ''; txt.maxLength = 512; txt.readOnly = c.state !== 'final'; txt.rows = 6; txt.setAttribute('aria-label', `Caption for photo ${i + 1}`);
+  const cnt = document.createElement('small'); cnt.className = 'capcount'; const upd = () => { cnt.textContent = `${txt.value.length} characters${p.revised ? ' · revised' : ''}`; }; upd();
+  txt.oninput = () => { p.caption = txt.value; upd(); }; box.append(txt, cnt);
+  if (c.state === 'draft' && p.capOk) { const ok = document.createElement('div'); ok.className = 'capdone'; ok.innerHTML = `✓ Approved <button class="linkbtn" type="button">Undo</button><small>${DONE_NOTE}</small>`;
+    ok.querySelector('button').onclick = () => { p.capOk = false; buildPay(); }; box.appendChild(ok); }
+  else if (c.state === 'draft') { const ask = document.createElement('textarea'); ask.className = 'capask'; ask.rows = 2; ask.placeholder = 'Anything wrong with the photo or the caption? (leave blank if both are right)'; ask.setAttribute('aria-label', `Changes for photo ${i + 1} or its caption`); ask.value = p.capNote || '';
+    ask.oninput = () => { const had = !!(p.capNote || '').trim(); p.capNote = ask.value; okb.disabled = !!ask.value.trim(); if (had !== !!ask.value.trim()) drawCapBar(); };
+    const okb = document.createElement('button'); okb.type = 'button'; okb.className = 'btn capokbtn'; okb.textContent = 'Approve photo and caption'; okb.disabled = !!(p.capNote || '').trim();
+    okb.onclick = () => { p.capOk = true; p.capNote = ''; if (order.photos.every(q => q.capOk)) { order.cap = { state: 'final' }; } buildPay(); };
+    box.append(ask, okb); }
+  if (c.state === 'final') { const ok = document.createElement('small'); ok.className = 'capcount'; ok.textContent = DONE_NOTE; box.appendChild(ok);
+    if (p.lastNote && !order.final) { const fx = document.createElement('div'); fx.className = 'capdone'; fx.innerHTML = '<small></small><button class="btn" type="button">Fix the outline on this photo (free)</button>'; fx.querySelector('small').textContent = `You wrote: "${p.lastNote}". The caption was rewritten; if your note was about the outline, fix it here.`;
+      fx.querySelector('button').onclick = () => { order.freeFix = true; if (isSat()) $('back5').onclick(); else fixPhoto(i); }; box.appendChild(fx); } }
+  if (c.state === 'revising' && (p.capNote || '').trim()) { const w = document.createElement('p'); w.className = 'capwait'; w.textContent = 'Rewriting…'; box.appendChild(w); }
+  d.appendChild(box); return d; }
+// Downloads: one ZIP (JSZip, loaded only when asked for) or each photo on its own. Captions, when ordered, ride along as captions.txt.
+const outName = p => p.name.replace(/\.[^.]+$/, '') + '_outlined.jpg';
+const finalBlob = p => new Promise(res => renderFinal(p.img, p.pts, p.mask, p.img.naturalWidth, p.img.naturalHeight).toBlob(res, 'image/jpeg', 0.92));
+const platBlob = p => new Promise(res => { const c = document.createElement('canvas'); c.width = p.img.naturalWidth; c.height = p.img.naturalHeight; c.getContext('2d').drawImage(p.img, 0, 0); c.toBlob(res, 'image/jpeg', 0.92); });
+const saveBlob = (b, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
+const captionsTxt = () => capFinal() && order.addons.captions && order.photos.some(p => p.caption) ? `Lot Outline · ${order.addr.split(',')[0].trim()}\nYour photos and their MLS captions, in gallery order.\n\n` + order.photos.map((p, i) => `${i + 1}. ${outName(p)}\n${p.caption || ''}\n`).join('\n') : '';
+const prog = t => { $('dlProg').hidden = !t; $('dlProg').textContent = t || ''; };
+const loadZip = () => window.JSZip ? Promise.resolve(window.JSZip) : new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = () => res(window.JSZip); sc.onerror = () => rej(new Error('ZIP tool did not load')); document.head.appendChild(sc); });
+$('dlZip').onclick = async () => { const btn = $('dlZip'); btn.disabled = true;
+  try { const Z = await loadZip(); const zip = new Z(); for (let i = 0; i < order.photos.length; i++) { prog(`Packing photo ${i + 1} of ${order.photos.length}…`); const ph = order.photos[i]; zip.file((ph.folder ? ph.folder + '/' : '') + outName(ph), await finalBlob(ph)); }
+    for (const pm of platList()) zip.file(pm.name, await platBlob(pm));
+    const cap = captionsTxt(); if (cap) zip.file('README.txt', cap); prog('Making the ZIP…');
+    const base = (order.addr.split(',')[0] || 'lot-outline').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    saveBlob(await zip.generateAsync({ type: 'blob', compression: 'STORE' }), `${base}_lot-outline.zip`); prog('');
+  } catch (e) { prog('The ZIP didn\'t work here. Use "Download each photo separately" instead.'); } btn.disabled = false; };
+$('dlEach').onclick = async () => { for (let i = 0; i < order.photos.length; i++) { prog(`Downloading ${i + 1} of ${order.photos.length}…`); saveBlob(await finalBlob(order.photos[i]), outName(order.photos[i])); await new Promise(r => setTimeout(r, 400)); }
+  for (const pm of platList()) { saveBlob(await platBlob(pm), pm.name); await new Promise(r => setTimeout(r, 400)); }
+  const cap = captionsTxt(); if (cap) saveBlob(new Blob([cap], { type: 'text/plain' }), 'README.txt'); prog(''); };
+
+// MLS upload: hand the finished photos (and captions) to the Lot Outline helper extension, which uploads them in the
+// agent's own signed-in Matrix tab. No MLS login touches this page.
+const helperOn = () => !!document.documentElement.dataset.loHelper;
+const mlsStat = t => { $('mlsStat').hidden = !t; $('mlsStat').textContent = t || ''; };
+window.addEventListener('message', e => { if (e.source !== window || !e.data || e.data.source !== 'lo-helper') return;
+  if (e.data.type === 'ready') $('mlsGet').hidden = true;
+  if (e.data.type === 'status') { mlsStat(e.data.text); if (e.data.stage === 'error') $('mlsGo').disabled = false; if (e.data.stage === 'done') { $('mlsGo').textContent = 'Uploaded'; } } });
+$('mlsGo').onclick = async () => {
+  if (!capFinal()) { mlsStat('Approve your captions first (above the photos), then upload.'); return; }
+  if (!helperOn()) { $('mlsGet').hidden = false; return; }
+  $('mlsGo').disabled = true; $('mlsGet').hidden = true;
+  const photos = []; for (let i = 0; i < order.photos.length; i++) { mlsStat(`Getting photo ${i + 1} of ${order.photos.length} ready…`); const p = order.photos[i]; const b = await finalBlob(p);
+    photos.push({ name: outName(p), caption: order.addons.captions ? (p.caption || '').slice(0, 512) : '', dataUrl: await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) }); }
+  window.postMessage({ source: 'lo-site', type: 'job', job: { id: Date.now().toString(36), address: order.addr.split(',')[0].trim(), mls: (order.har && order.har.mlsid) || '', photos } }, location.origin);
+  mlsStat('Handing the photos to the helper…'); };
+setTimeout(() => window.postMessage({ source: 'lo-site', type: 'hello' }, location.origin), 300);
+
+
+// ---------- saving: every order lives under the agent's account and reopens where it was left ----------
+// The row is created the moment an address is picked, then saved on every step change, every few seconds while anything
+// changes, and when the tab is hidden. Uploaded originals go to private storage in the background (3 at a time).
+// The agent's look and add-on picks are their preferences: a new order starts from them instead of the factory defaults.
+let lastJSON = '', lastPrefs = '', saving = null, saveAgain = false, thumbDirty = true, upActive = 0;
+const savedEl = $('saved');
+function say(t, cls){ savedEl.hidden = !t; savedEl.textContent = t || ''; savedEl.className = 'saved' + (cls ? ' ' + cls : ''); }
+const statusOf = () => order.cancelled ? 'cancelled' : order.final ? 'delivered' : 'draft';
+function stateJSON(){ const o = { ...order }; delete o.photos;
+  return JSON.stringify({ v: 1, order: LO.orders.clean(o), style: { ...st }, photos: order.photos.filter(p => p.path || p.src || p.sat).map(p => LO.orders.clean(p)) }); }
+function thumbData(){ const p = order.photos[order.pinIdx || 0] || order.photos[0]; if (!p || !p.img || !p.img.naturalWidth && !p.img.width) return null;
+  try { const iw = p.img.naturalWidth || p.img.width, ih = p.img.naturalHeight || p.img.height, W = 360, H = Math.round(W * ih / iw); return renderFinal(p.img, p.pts || [], p.mask, W, H).toDataURL('image/jpeg', 0.72); } catch (e) { return null; } }
+const pendingUploads = () => order.photos.filter(p => p.file && !p.path).length;
+function saveNow(){ if (!order.addr || !LO.orders) return Promise.resolve(); if (saving) { saveAgain = true; return saving; }
+  saving = (async () => { try {
+    const json = stateJSON();
+    if (!order.id) { say('Saving…', 'busy'); const id = await LO.orders.create({ address: order.addr, mode: order.mode, step: order.step, state: JSON.parse(json) });
+      if (!id) { say('Not saved yet', 'bad'); return; } order.id = id; history.replaceState(null, '', 'app.html?order=' + id + location.hash); uploadPending(); }
+    if (json === lastJSON && !thumbDirty) { if (!upActive) say('Saved'); return; }
+    say('Saving…', 'busy'); const fields = { address: order.addr, mode: order.mode, step: order.step, status: statusOf(), photo_count: order.photos.length,
+      price_cents: Math.round((orderPrice() || 0) * 100), style: { ...st }, addons: LO.orders.clean(order.addons), state: JSON.parse(json), finalized_at: order.finalizedAt || null };
+    if (thumbDirty && order.photos.length) { const t = thumbData(); if (t) fields.thumb = t; } thumbDirty = false;
+    if (await LO.orders.update(order.id, fields)) { lastJSON = json; say(upActive ? `Saving photos · ${pendingUploads()} left` : 'Saved', upActive ? 'busy' : ''); } else say('Not saved, retrying', 'bad');
+  } finally { saving = null; if (saveAgain) { saveAgain = false; saveNow(); } } })();
+  return saving; }
+async function uploadPending(){ if (!order.id) return; const id = order.id;
+  const next = () => order.photos.find(p => p.file && !p.path && !p.uploading);
+  const worker = async () => { let p; while ((p = next()) && order.id === id) { p.uploading = true; upActive++; say(`Saving photos · ${pendingUploads()} left`, 'busy');
+    const path = await LO.orders.upload(id, p.file, p.img); upActive--; p.uploading = false;
+    if (path) { p.path = path; delete p.file; } else { p.uploadFailed = (p.uploadFailed || 0) + 1; if (p.uploadFailed > 2) { delete p.file; console.warn('gave up saving', p.name); } }
+    saveNow(); } };
+  await Promise.all([worker(), worker(), worker()]); }
+function prefsJSON(){ return JSON.stringify({ style: { ...st, innerOn: st.innerOn === true || st.innerOn === 'on' }, addons: { enhance: !!order.addons.enhance, captions: !!order.addons.captions, mlsUpload: !!order.addons.mlsUpload } }); }
+function savePrefs(){ const j = prefsJSON(); if (j === lastPrefs) return; lastPrefs = j; LO.orders.savePrefs(JSON.parse(j)); }
+setInterval(() => { if (document.visibilityState === 'visible') { saveNow(); savePrefs(); } }, 4000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveNow(); savePrefs(); } });
+window.addEventListener('beforeunload', e => { if (pendingUploads()) { e.preventDefault(); e.returnValue = ''; } });
+
+// Put the saved look on the Look step's controls.
+function applyStyle(){ st.innerOn = st.innerOn === true || st.innerOn === 'on';
+  setColor('lineColor', st.lineColor, 'lineColor', 'lineHex'); setColor('fillColor', st.fillColor, 'fillColor', 'fillHex'); setColor('innerColor', st.innerColor, 'innerColor', 'innerHex');
+  $('lineW').value = st.lineW; $('lineWv').textContent = (+st.lineW).toFixed(2) + '%';
+  $('lineA').value = Math.round(st.lineA * 100); $('lineAv').textContent = Math.round(st.lineA * 100) + '%';
+  $('fillA').value = Math.round(st.fillA * 100); $('fillAv').textContent = Math.round(st.fillA * 100) + '%';
+  $('hatchGap').value = st.hatchGap; $('hatchGapv').textContent = st.hatchGap < 1.4 ? 'Tight' : st.hatchGap < 2.6 ? 'Medium' : 'Wide';
+  const on = (id, v) => [...$(id).children].forEach(x => x.classList.toggle('on', x.dataset.m === v));
+  on('cover', st.cover); on('blend', st.fillMode); on('dash', st.dash); on('innerOn', st.innerOn ? 'on' : 'off');
+  $('innerColorBox').hidden = !st.innerOn; $('innerMatch').checked = st.innerMatch; $('innerPick').hidden = st.innerMatch; $('hatchBox').hidden = st.fillMode !== 'hatch'; }
+
+// Reopen a saved order: address card, photos (from storage, HAR or the examples), pins, look, add-ons, then the step it was on.
+async function resume(id){ const row = await LO.orders.load(id); const S = row && row.state; if (!S || !S.order) return false;
+  const reopen = t => { $('reopen').hidden = !t; $('reopenT').textContent = t || ''; }; reopen('Opening ' + (row.address || 'your order').split(',')[0] + '…');
+  try {
+    Object.assign(order, S.order, { id: row.id, photos: [] }); Object.assign(st, S.style || {}); applyStyle(); setFlow(order.mode || 'photos');
+    $('addr').value = order.addr || '';
+    if (order.addr) { $('parcel').classList.add('in'); $('paths').classList.add('in'); $('go1').disabled = false; $('go1sat').disabled = false;
+      if (order.parcel) { $('pname').textContent = order.parcel.pending ? 'Address set' : 'Parcel found'; $('pdesc').textContent = `${order.parcel.cad} · ${order.parcel.dims}`; if (order.parcel.pts) $('pshape').setAttribute('points', order.parcel.pts); }
+      if ((order.parcelList || []).length) { await showParcels(); $('moreP').hidden = false; } }
+    const recs = S.photos || [];
+    if (isSat() && recs.length) { reopen('Rebuilding the satellite kit…'); await LO.sat.buildKit(order);
+      const byName = new Map(recs.map(r => [r.name, r])); order.photos.forEach(p => { const r = byName.get(p.name); if (r) Object.assign(p, { ...r, img: p.img, view: p.view }); }); }
+    else if (recs.length) { order.photos = await LO.orders.loadPhotos(recs, (n, t) => reopen(`Loading photo ${n} of ${t}…`));
+      if (order.photos.length < recs.length) console.warn(`${recs.length - order.photos.length} saved photo(s) could not be loaded`); }
+    renderGrid2(); lastJSON = stateJSON(); thumbDirty = false;
+    if (order.created) { $('agree5').checked = true; $('go5').disabled = false; $('go5').textContent = 'Save and continue'; }
+    if (isSat()) $('kitprice').textContent = fmt(LO.sat.PRICE);
+    let n = order.step || 1; if (!order.photos.length && n !== 1) n = isSat() ? 7 : 2;
+    if (n === 6 && !order.created) n = 5;
+    cur = order.pinIdx || 0; order.fixing = -1;
+    if (n === 3) { $('h3').textContent = isSat() ? 'Is the lot where it should be?' : 'Are the pins on the fence?'; $('p3').textContent = isSat() ? 'County lines, placed on the close-up. Drag only if something is off; every other image follows this one.' : `Pins on photo ${cur + 1}. Drag any that are off, then use them for all photos.`; $('acts3').hidden = false; $('acts3fix').hidden = true; }
+    go(n); if (n === 4) carry(true);
+    return true;
+  } catch (e) { console.warn('resume', e); return false; } finally { reopen(''); } }
+
+// Orders still in process, offered on the Address step of a fresh order.
+async function resumeLine(){ const L = (await LO.orders.list()).filter(r => r.status === 'draft' && r.id !== order.id).slice(0, 3); if (!L.length) return;
+  const el = $('resumeLine'); el.innerHTML = 'Pick up where you left off: ' + L.map(r => `<a href="app.html?order=${r.id}">${esc((r.address || 'Untitled').split(',')[0])}</a>`).join(' · ') + ' · <a href="account.html">All orders</a>'; el.hidden = false; }
+
+(async () => {
+  const id = new URLSearchParams(location.search).get('order');
+  if (id && await resume(id)) return;
+  if (id) history.replaceState(null, '', 'app.html' + location.hash);
+  setFlow(/^#(satellite|upgrade)$/.test(location.hash) ? 'satellite' : 'photos');
+  const P = await LO.orders.prefs().catch(() => ({}));
+  if (P.style) Object.assign(st, P.style); if (P.addons) Object.assign(order.addons, P.addons);
+  applyStyle(); lastPrefs = prefsJSON(); go(1); resumeLine();
+})();
+window.LO._test = { order, go, fitView };   // test hook (screenshots / regression), no UI
+})();
+</script>
+</body>
+</html>

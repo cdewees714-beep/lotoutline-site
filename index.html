@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lot Outline — every aerial photo, lot outlined, MLS-ready</title>
+<meta name="description" content="Drop the drone photos, type the address, confirm one photo. Every shot comes back with the lot outlined and highlighted, MLS-ready. From $15.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://lotoutline.com/">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Lot Outline">
+<meta property="og:url" content="https://lotoutline.com/">
+<meta property="og:title" content="Lot Outline — every aerial photo, lot outlined, MLS-ready">
+<meta property="og:description" content="Drop the drone photos, type the address, confirm one photo. Every shot comes back with the lot outlined and highlighted, MLS-ready. From $15.">
+<meta property="og:image" content="https://lotoutline.com/hero-maroneal.jpg">
+<meta property="og:image:width" content="2048">
+<meta property="og:image:height" content="1152">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lot Outline — every aerial photo, lot outlined, MLS-ready">
+<meta name="twitter:description" content="Drop the drone photos, type the address, confirm one photo. Every shot comes back with the lot outlined and highlighted, MLS-ready.">
+<meta name="twitter:image" content="https://lotoutline.com/hero-maroneal.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","@id":"https://lotoutline.com/#org","name":"Lot Outline","alternateName":["LotOutline","lotoutline.com","Lot Outline Studio"],"url":"https://lotoutline.com/","logo":"https://lotoutline.com/favicon.svg","email":"support@lotoutline.com","areaServed":[{"@type":"City","name":"Houston"},{"@type":"City","name":"Galveston"},{"@type":"AdministrativeArea","name":"Harris County, Texas"},{"@type":"AdministrativeArea","name":"Galveston County, Texas"},{"@type":"AdministrativeArea","name":"Fort Bend County, Texas"},{"@type":"AdministrativeArea","name":"Montgomery County, Texas"},{"@type":"AdministrativeArea","name":"San Jacinto County, Texas"},{"@type":"State","name":"Texas"}]},
+{"@type":"WebSite","@id":"https://lotoutline.com/#site","url":"https://lotoutline.com/","name":"Lot Outline","alternateName":"LotOutline","publisher":{"@id":"https://lotoutline.com/#org"}},
+{"@type":"WebPage","@id":"https://lotoutline.com/#page","url":"https://lotoutline.com/","name":"Lot Outline — every aerial photo, lot outlined, MLS-ready","isPartOf":{"@id":"https://lotoutline.com/#site"},"about":{"@id":"https://lotoutline.com/#org"},"primaryImageOfPage":"https://lotoutline.com/hero-maroneal.jpg"},
+{"@type":"Service","name":"Lot outlines on aerial listing photos","serviceType":"Real estate photo editing — lot boundary outline and highlight","provider":{"@id":"https://lotoutline.com/#org"},"audience":{"@type":"Audience","audienceType":"Real estate agents and drone photographers"},"offers":{"@type":"AggregateOffer","priceCurrency":"USD","lowPrice":"15","highPrice":"50","offerCount":"6","url":"https://lotoutline.com/#pricing"}}
+]}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="lo.css">
+<style>
+.hero{padding:64px 0 40px;display:flex;flex-direction:column;gap:36px;align-items:center;text-align:center}
+.hero h1{font-size:clamp(46px,7vw,86px);line-height:.98;letter-spacing:-.035em;max-width:760px}
+.hero h1 span{color:var(--accent)}
+.hero p{margin:0;font-size:clamp(17px,2vw,20px);color:var(--fg-2);max-width:560px}
+.cta{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center}
+.cta small{font-size:15px;color:var(--muted)}
+.paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:760px;width:100%;text-align:left}
+.path{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;font-size:15px;color:var(--fg-2)}
+.path strong{color:var(--fg);font-size:16px}
+a.path{text-decoration:none;cursor:pointer;transition:transform .18s ease-out,box-shadow .18s ease-out,border-color .18s ease-out}
+a.path:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(30,42,34,.10);border-color:var(--fg-2)}
+a.path.sat:hover{border-color:#D9B84A}
+a.path:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.path strong i{font-style:normal;display:inline-block;margin-left:4px;transition:transform .18s ease-out}
+a.path:hover strong i{transform:translateX(3px)}
+@media (prefers-reduced-motion:reduce){a.path,a.path strong i{transition:none}a.path:hover{transform:none}a.path:hover strong i{transform:none}}
+.path.sat{background:#FFF6D6;border-color:#F2D77A}
+@media (max-width:600px){.paths{grid-template-columns:minmax(0,1fr)}}
+.shot{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-xl);overflow:hidden;background:#DCE5DD;box-shadow:0 24px 48px -28px rgba(30,42,34,.5)}
+.shot img,.shot svg{position:absolute;inset:0;width:100%;height:100%}
+.shot img{object-fit:cover}
+.shot .cap{position:absolute;left:18px;bottom:16px;padding:9px 14px;border-radius:12px;background:#fff;font-size:14px;font-weight:600}
+/* hero motion: pin drops, yellow floods from the pin corner, green edge tightens */
+.fl{transform:scale(0);transform-box:fill-box;transform-origin:100% 0;animation:flood 500ms ease-out 700ms forwards}
+@keyframes flood{to{transform:scale(1)}}
+.ed{stroke-dasharray:1;stroke-dashoffset:1;animation:tight 1400ms var(--ease) 1100ms forwards}
+@keyframes tight{to{stroke-dashoffset:0}}
+.pn{transform:translateY(-40px);opacity:0;transform-box:fill-box;animation:drop 180ms var(--spring) 480ms forwards}
+@keyframes drop{to{transform:none;opacity:1}}
+
+section.block{padding:56px 0}
+.block h2{font-size:clamp(32px,4vw,42px);margin-bottom:28px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.step{background:var(--surface);border-radius:var(--r-lg);padding:28px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.step .n{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--sun);font-family:var(--display);font-weight:700;font-size:18px;color:var(--sun-fg)}
+.step h3{font-size:21px}
+.step p{margin:0;color:var(--fg-2)}
+.step.you{background:var(--accent);color:#fff}
+.step.you p{color:#E4F1E8}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.fig{position:relative;aspect-ratio:4/3;border-radius:var(--r-lg);overflow:hidden;background:#DCE5DD;margin:0}
+.fig img,.fig svg{position:absolute;inset:0;width:100%;height:100%}
+.fig img{object-fit:cover}
+.fig .tag{position:absolute;left:16px;top:14px;padding:7px 12px;border-radius:10px;background:#fff;font-size:13px;font-weight:700}
+.fig .tag.on{background:var(--sun)}
+.sampler{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.sampler figure{margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.sampler .fig{border-radius:16px}
+.sampler figcaption{font-size:14px;font-weight:600;color:var(--fg-2)}
+.subhead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
+.subhead h2{margin:0}
+.subhead p{margin:0;color:var(--muted);max-width:380px;font-size:15px}
+.pricing{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px;align-items:center}
+.pricing p{color:var(--fg-2);max-width:420px}
+.pt{background:var(--surface);border-radius:var(--r-lg);padding:8px 0}
+.pt table{width:100%;border-collapse:collapse;font-size:17px}
+.pt td{padding:14px 24px}
+.pt tr+tr td{border-top:1px solid var(--line)}
+.pt td:last-child{text-align:right;font-family:var(--display);font-weight:700;font-size:22px}
+.promise{background:var(--fg);color:#fff;border-radius:var(--r-xl);padding:48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.promise h2{color:var(--sun);font-size:36px;margin:0 0 10px}
+.promise h3{font-size:18px;margin:8px 0 10px}
+.promise p{margin:0;color:#C9D6CC;font-size:15px}
+footer{border-top:1px solid var(--line);padding:28px 0 40px;font-size:14px;color:var(--muted)}
+footer .row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
+footer a{color:var(--muted);text-decoration:none;margin-left:24px}
+@media (max-width:860px){.steps,.sampler,.promise{grid-template-columns:repeat(2,minmax(0,1fr))}.pricing{grid-template-columns:minmax(0,1fr)}.promise{padding:32px}}
+@media (max-width:600px){.steps,.sampler,.two,.promise{grid-template-columns:minmax(0,1fr)}.hero{padding-top:40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="nav" aria-label="Main">
+  <a class="brand" href="index.html" aria-label="Lot Outline home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13V17a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h7" fill="#F7C948" fill-opacity=".3" stroke="#2F7A56" stroke-width="2.5" stroke-linecap="round"/><path d="M19 1.6c-2.1 0-3.6 1.6-3.6 3.5 0 2.7 3.6 5.6 3.6 5.6s3.6-2.9 3.6-5.6c0-1.9-1.5-3.5-3.6-3.5z" fill="#2F7A56"/><circle cx="19" cy="5.1" r="1.3" fill="#fff"/></svg>
+    <b>Lot Outline</b>
+  </a>
+  <div class="links">
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#promise">The promise</a>
+    <a class="btn sm" id="navAuth" href="login.html">Sign in</a>
+  </div>
+</nav>
+
+<section class="hero" id="top">
+  <div style="display:flex;flex-direction:column;gap:18px;align-items:center">
+    <h1>Drop the photos.<br><span>Get the outline.</span></h1>
+    <p>Address, one photo to confirm, and every shot comes back outlined and MLS-ready.</p>
+    <div class="cta">
+      <a class="btn primary lg" href="app.html">Outline a listing</a>
+      <a class="btn lg" href="app.html#upgrade">Upgrade a listing for $35</a>
+    </div>
+    <div class="paths">
+      <a class="path sat" href="app.html#upgrade"><strong>Already listed? Make it look finished. <i aria-hidden="true">&rarr;</i></strong><span>Paste your HAR link. For $35 we add the aerial with the lot outlined, the plat map, what's nearby and which way it faces. No photographer.</span></a>
+      <a class="path" href="app.html"><strong>Have the shoot? <i aria-hidden="true">&rarr;</i></strong><span>Drop your drone photos or paste the HAR listing link. 5 photos for $15. Preview free.</span></a>
+    </div>
+  </div>
+  <figure class="shot" style="margin:0">
+    <img src="hero-maroneal.jpg" width="1600" height="900" alt="Aerial photo of a Houston house lot with the lot outlined" fetchpriority="high">
+    <svg viewBox="0 0 2048 1152" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <polygon class="fl" points="628,228 1054,228 1050,1030 550,1030" fill="#F7C948" fill-opacity=".45"/>
+      <polygon class="ed" pathLength="1" points="1054,228 1050,1030 550,1030 628,228 1054,228" fill="none" stroke="#2F7A56" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>
+      <g class="pn"><path d="M1054 163c-26 0-46 20-46 44 0 34 46 72 46 72s46-38 46-72c0-24-20-44-46-44z" fill="#2F7A56"/><circle cx="1054" cy="207" r="15" fill="#fff"/></g>
+    </svg>
+    <span class="cap">Maroneal St, Houston · 12 photos · done in one sitting</span>
+  </figure>
+</section>
+
+<section class="block" id="how">
+  <h2 style="text-align:center">Three steps. One is yours.</h2>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><h3>Drop the photos</h3><p>Upload your drone photos, paste a link to your HAR listing, or just pick the property address. Original photos give the cleanest result.</p></div>
+    <div class="step"><span class="n">2</span><h3>Type the address</h3><p>We grab the parcel from the county. Real shape, real footage.</p></div>
+    <div class="step you"><span class="n">3</span><h3>Confirm one photo</h3><p>We’re usually right, but we want to be sure. If our automated map disagrees with the boundary line, adjust a pin or two on the first photo and we carry those markers to every angle you uploaded.</p></div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="subhead"><h2>Before and after on a hard one.</h2><p>65 Lakeside, Galveston. A vacant canal lot: water edge and neighbor's bulkhead included.</p></div>
+  <div class="two">
+    <figure class="fig"><img src="hero-lakeside.jpg" width="1200" height="900" alt="Canal lot, untouched aerial" loading="lazy"><span class="tag">Before</span></figure>
+    <figure class="fig"><img src="hero-lakeside-ground.jpg" width="1200" height="900" alt="Canal lot, outlined in red and highlighted in yellow, the line to the bulkhead, palms left uncovered" loading="lazy"><span class="tag on">After</span></figure>
+  </div>
+</section>
+
+<section class="block">
+  <h2>Pick a look. Try as many as you like before you order.</h2>
+  <div class="sampler">
+    <figure><div class="fig"><img src="hero-lakeside.jpg" alt="" loading="lazy"><svg viewBox="0 0 2576 1932" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon points="496,950 1618,950 1724,1447 506,1447" fill="#F7C948" fill-opacity=".45" stroke="#2F7A56" stroke-width="14"/></svg></div><figcaption>Green line, yellow fill</figcaption></figure>
+    <figure><div class="fig"><img src="hero-lakeside.jpg" alt="" loading="lazy"><svg viewBox="0 0 2576 1932" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon points="496,950 1618,950 1724,1447 506,1447" fill="none" stroke="#fff" stroke-width="22"/></svg></div><figcaption>White, line only</figcaption></figure>
+    <figure><div class="fig"><img src="hero-lakeside.jpg" alt="" loading="lazy"><svg viewBox="0 0 2576 1932" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon points="496,950 1618,950 1724,1447 506,1447" fill="#F2D21E" fill-opacity=".55" stroke="#F2D21E" stroke-width="12"/></svg></div><figcaption>MLS yellow, solid</figcaption></figure>
+    <figure><div class="fig"><img src="hero-lakeside.jpg" alt="" loading="lazy"><svg viewBox="0 0 2576 1932" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><polygon points="496,950 1618,950 1724,1447 506,1447" fill="none" stroke="#E53935" stroke-width="10" stroke-dasharray="60 40"/></svg></div><figcaption>Red dashed, see-through</figcaption></figure>
+  </div>
+</section>
+
+<section class="block" id="pricing">
+  <div class="pricing">
+    <div><h2>Simple prices. Pay after you see it.</h2><p>Previews are free. See every photo before you finalize, or cancel for a full refund. Changing the look after you create the order is $2.</p></div>
+    <div class="pt"><table><tbody>
+      <tr><td>5 photos</td><td>$15</td></tr><tr><td>10 photos</td><td>$20</td></tr><tr><td>15 photos</td><td>$25</td></tr>
+      <tr><td>20 photos</td><td>$30</td></tr><tr><td>30 photos</td><td>$40</td></tr><tr><td>40 photos</td><td>$50</td></tr>
+      <tr><td>Listing upgrade, no photos needed (11 MLS-ready images)</td><td>$35</td></tr>
+    </tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="promise" style="padding-bottom:72px">
+  <div class="promise">
+    <div><h2>The promise</h2><p>Every photo is checked before you see it. One we can't place gets flagged, not guessed.</p></div>
+    <div><h3>Our miss, free redo</h3><p>If a pin you placed was wrong, a rerun is a new order. We say so before the run.</p></div>
+    <div><h3>Your pins are the line</h3><p>Fences are the reference. We never assume an offset from a neighbor's wall.</p></div>
+  </div>
+</section>
+</div>
+
+<footer><div class="wrap row"><span>Lot Outline (LotOutline.com) · Harris, Galveston, Fort Bend, Montgomery and San Jacinto counties, Texas · © 2026 Lot Outline</span><span><a href="#pricing">Pricing</a><a href="#promise">Redo policy</a><a href="mailto:support@lotoutline.com">Contact</a></span></div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<script>LO.session().then(s=>{ if(s){ const a=document.getElementById('navAuth'); a.textContent='Your orders'; a.href='account.html'; } });</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — Lot Outline</title>
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="https://lotoutline.com/login.html">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="lo.css">
+<style>
+html,body{min-height:100%}
+body{display:grid;place-items:center;padding:24px 16px}
+.card{width:100%;max-width:420px;background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);padding:32px 30px 26px;box-shadow:0 24px 48px -32px rgba(30,42,34,.3)}
+.brand{margin-bottom:24px}
+h1{font-size:30px;margin:0 0 6px}
+p.lead{color:var(--fg-2);margin:0 0 20px}
+.btn{width:100%}
+.btn svg{width:18px;height:18px;flex:none}
+.gis{min-height:48px;display:flex;justify-content:center}
+.gis>div{width:100%!important} .gis iframe{transform:scale(1.1);transform-origin:center}
+.stack{display:grid;gap:10px}
+.or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:12px;font-weight:600;margin:18px 0;text-transform:uppercase;letter-spacing:.08em}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--line)}
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 6px}
+input{width:100%;min-height:50px;padding:0 16px;border-radius:var(--r);border:1.5px solid var(--line);background:#fff;font-size:16px}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(47,122,86,.12)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+a.link,button.link{background:none;border:0;padding:0;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+a.link:hover,button.link:hover{color:var(--fg)}
+.msg{min-height:20px;font-size:13px;margin:12px 0 10px;color:var(--muted)}
+.msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+.foot{margin-top:18px;text-align:center;color:var(--muted);font-size:14px}
+.hidden{display:none}
+.home{display:block;text-align:center;margin-top:18px;font-size:13px;color:var(--faint);text-decoration:none}
+</style>
+</head>
+<body>
+<main class="card">
+  <a class="brand" href="index.html" aria-label="Lot Outline home">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13V17a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h7" fill="#F7C948" fill-opacity=".3" stroke="#2F7A56" stroke-width="2.5" stroke-linecap="round"/><path d="M19 1.6c-2.1 0-3.6 1.6-3.6 3.5 0 2.7 3.6 5.6 3.6 5.6s3.6-2.9 3.6-5.6c0-1.9-1.5-3.5-3.6-3.5z" fill="#2F7A56"/><circle cx="19" cy="5.1" r="1.3" fill="#fff"/></svg>
+    <b>Lot Outline</b>
+  </a>
+
+  <!-- SIGN IN -->
+  <section id="v-signin">
+    <h1>Sign in</h1>
+    <p class="lead">Drop the photos or pick the address. Get the outline.</p>
+    <div class="stack">
+      <div class="gis" data-gis></div>
+      <button class="btn" id="a-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.4-.8 1.6 0 2 .8 3.4.8s2.3-1.3 3.1-2.5c1-1.4 1.4-2.8 1.4-2.9-.1 0-2.8-1.1-2.8-4.2zM13.9 4.9c.7-.9 1.2-2.1 1-3.3-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.2 1.2.1 2.3-.6 3.1-1.5z"/></svg>
+        Continue with Apple
+      </button>
+    </div>
+    <div class="or">or</div>
+    <form id="f-signin" novalidate>
+      <label for="si-email">Email</label>
+      <input id="si-email" type="email" autocomplete="email" required>
+      <label for="si-pass">Password</label>
+      <input id="si-pass" type="password" autocomplete="current-password" required>
+      <div class="row"><button class="link" type="button" data-go="magic">Email me a sign-in link instead</button><button class="link" type="button" data-go="forgot">Forgot password?</button></div>
+      <div class="msg" id="si-msg"></div>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+    <div class="foot">New here? <button class="link" type="button" data-go="signup">Create an account</button></div>
+  </section>
+
+  <!-- SIGN UP -->
+  <section id="v-signup" class="hidden">
+    <h1>Create your account</h1>
+    <p class="lead">Free to join. Pay per order when you're ready.</p>
+    <div class="stack">
+      <div class="gis" data-gis></div>
+      <button class="btn" type="button" data-oauth="apple">Continue with Apple</button>
+    </div>
+    <div class="or">or</div>
+    <form id="f-signup" novalidate>
+      <label for="su-name">Name</label>
+      <input id="su-name" type="text" autocomplete="name" required>
+      <label for="su-email">Email</label>
+      <input id="su-email" type="email" autocomplete="email" required>
+      <label for="su-pass">Password <span style="color:var(--muted)">(8+ characters)</span></label>
+      <input id="su-pass" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="msg" id="su-msg"></div>
+      <button class="btn primary" type="submit">Create account</button>
+    </form>
+    <div class="foot">Already have an account? <button class="link" type="button" data-go="signin">Sign in</button></div>
+  </section>
+
+  <!-- MAGIC LINK -->
+  <section id="v-magic" class="hidden">
+    <h1>Email me a link</h1>
+    <p class="lead">No password needed. We'll send a one-time sign-in link.</p>
+    <form id="f-magic" novalidate>
+      <label for="ml-email">Email</label>
+      <input id="ml-email" type="email" autocomplete="email" required>
+      <div class="msg" id="ml-msg"></div>
+      <button class="btn primary" type="submit">Send link</button>
+    </form>
+    <div class="foot"><button class="link" type="button" data-go="signin">Back to sign in</button></div>
+  </section>
+
+  <!-- FORGOT -->
+  <section id="v-forgot" class="hidden">
+    <h1>Reset password</h1>
+    <p class="lead">We'll email you a link to choose a new one.</p>
+    <form id="f-forgot" novalidate>
+      <label for="fp-email">Email</label>
+      <input id="fp-email" type="email" autocomplete="email" required>
+      <div class="msg" id="fp-msg"></div>
+      <button class="btn primary" type="submit">Send reset link</button>
+    </form>
+    <div class="foot"><button class="link" type="button" data-go="signin">Back to sign in</button></div>
+  </section>
+
+  <!-- NEW PASSWORD (after reset link) -->
+  <section id="v-reset" class="hidden">
+    <h1>Choose a new password</h1>
+    <form id="f-reset" novalidate>
+      <label for="np-pass">New password</label>
+      <input id="np-pass" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="msg" id="np-msg"></div>
+      <button class="btn primary" type="submit">Save and continue</button>
+    </form>
+  </section>
+  <a class="home" href="index.html">Back to lotoutline.com</a>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script>
+(async () => {
+  const $ = id => document.getElementById(id);
+  const views = ['signin','signup','magic','forgot','reset'];
+  const show = v => views.forEach(x => $('v-'+x).classList.toggle('hidden', x !== v));
+  const say = (id, text, cls='') => { const m = $(id); m.textContent = text; m.className = 'msg ' + cls; };
+  const nice = e => (e && e.message) ? e.message.replace('Invalid login credentials','Wrong email or password.') : 'Something went wrong.';
+
+  document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => show(b.dataset.go));
+  const gis = () => LO.googleButtons([...document.querySelectorAll('[data-gis]')], e => { const m = $('si-msg'); m.className='msg err'; m.textContent = e.message; });
+  if (window.google?.accounts?.id) gis(); else { const t = document.querySelector('script[src*="gsi/client"]'); t.addEventListener('load', gis); t.addEventListener('error', gis); }
+  $('a-btn').onclick = () => LO.apple();
+  document.querySelectorAll('[data-oauth]').forEach(b => b.onclick = () => LO[b.dataset.oauth]());
+
+  // Already signed in -> straight to the studio. Reset link -> new-password view.
+  const params = new URLSearchParams(location.search);
+  LO.sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') show('reset'); });
+  if (params.get('reset')) show('reset');
+  else if (await LO.session()) { location.replace(LO.home); return; }
+
+  $('f-signin').onsubmit = async e => { e.preventDefault(); say('si-msg','Signing in…');
+    const { error } = await LO.signIn($('si-email').value.trim(), $('si-pass').value);
+    if (error) return say('si-msg', nice(error), 'err');
+    location.replace(LO.home); };
+
+  $('f-signup').onsubmit = async e => { e.preventDefault();
+    if ($('su-pass').value.length < 8) return say('su-msg','Password needs at least 8 characters.','err');
+    say('su-msg','Creating your account…');
+    const { data, error } = await LO.signUp($('su-email').value.trim(), $('su-pass').value, $('su-name').value.trim());
+    if (error) return say('su-msg', nice(error), 'err');
+    if (data.session) return location.replace(LO.home);
+    say('su-msg','Check your email to confirm your account, then sign in.','ok'); };
+
+  $('f-magic').onsubmit = async e => { e.preventDefault(); say('ml-msg','Sending…');
+    const { error } = await LO.magicLink($('ml-email').value.trim());
+    say('ml-msg', error ? nice(error) : 'Link sent. Check your email (and spam) and tap it on this device.', error ? 'err' : 'ok'); };
+
+  $('f-forgot').onsubmit = async e => { e.preventDefault(); say('fp-msg','Sending…');
+    const { error } = await LO.reset($('fp-email').value.trim());
+    say('fp-msg', error ? nice(error) : 'Reset link sent. Check your email.', error ? 'err' : 'ok'); };
+
+  $('f-reset').onsubmit = async e => { e.preventDefault();
+    if ($('np-pass').value.length < 8) return say('np-msg','Password needs at least 8 characters.','err');
+    const { error } = await LO.updatePassword($('np-pass').value);
+    if (error) return say('np-msg', nice(error), 'err');
+    location.replace(LO.home); };
+})();
+</script>
+</body>
+</html>

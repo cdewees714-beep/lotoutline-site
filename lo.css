@@ -1,0 +1,57 @@
+/* Lot Outline — Bright Acre brand (tuned palette, 10/10/2026)
+   Warm white ground, mist surfaces, pine text, lawn green accent, sun tint for the lot. */
+:root{
+  --bg:#FBFBF8; --surface:#F2F6F1; --line:#E1E8E2; --fg:#1E2A22; --fg-2:#4C5A50; --muted:#6A7A6E; --faint:#9AA79E;
+  --accent:#2F7A56; --accent-hover:#235C41; --accent-fg:#FFFFFF; --sun:#F7C948; --sun-fg:#1E2A22;
+  --ok:#2F7A56; --warn:#B9771C; --warn-bg:#FFF4DC; --err:#B23B3B;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:'Figtree',system-ui,sans-serif;
+  --r-sm:10px; --r:14px; --r-lg:20px; --r-xl:24px;
+  --ease:cubic-bezier(.4,0,.2,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--body)}
+a{color:var(--accent)} a:hover{color:var(--accent-hover)}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.03em;margin:0;line-height:1.05}
+h1{font-variation-settings:'opsz' 96}
+img{max-width:100%;display:block}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid rgba(47,122,86,.45);outline-offset:2px;border-radius:var(--r-sm)}
+
+.wrap{max-width:1120px;margin:0 auto;padding-inline:24px}
+@media (max-width:600px){.wrap{padding-inline:16px}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 24px;border-radius:var(--r);border:0;background:var(--surface);color:var(--fg);font-weight:600;font-size:16px;text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .15s,transform .12s var(--ease)}
+.btn:hover{background:#E7EEE8;color:var(--fg)}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);font-weight:700}
+.btn.primary:hover{background:var(--accent-hover);color:var(--accent-fg)}
+.btn.lg{min-height:56px;padding:0 30px;font-size:17px;border-radius:16px}
+.btn.sm{min-height:40px;padding:0 16px;font-size:14px;border-radius:var(--r-sm)}
+.btn.ghost{background:transparent}
+.btn.ghost:hover{background:var(--surface)}
+.btn[disabled]{opacity:.45;cursor:default;transform:none}
+.btn.link{background:none;padding:0;min-height:0;border-radius:0;font-weight:600;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.btn.link:hover{color:var(--fg);background:none}
+
+/* brand */
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--fg)}
+.brand svg{width:30px;height:30px;flex:none}
+.brand b{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.02em}
+
+/* nav */
+.nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:22px 0 0}
+.nav .links{display:flex;flex-wrap:wrap;gap:22px;align-items:center;font-weight:600;font-size:15px}
+.nav .links a{color:var(--fg);text-decoration:none}
+.nav .links a:hover{color:var(--accent)}
+
+/* inputs */
+.field{width:100%;min-height:54px;padding:0 18px;border-radius:var(--r);border:1.5px solid var(--line);background:#fff;font-size:17px;transition:border-color .15s}
+.field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(47,122,86,.12)}
+label.lbl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px}
+
+/* motion */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0ms!important;transition-duration:.001ms!important}}

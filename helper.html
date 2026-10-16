@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lot Outline Helper for Chrome</title>
+<meta name="description" content="Add the Lot Outline Helper to Chrome so your finished photos and captions go straight onto your MLS listing, in your own signed-in tab.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="lo.css">
+<style>
+body{padding:40px 16px 64px}
+.wrap{max-width:760px;margin:0 auto;display:grid;gap:22px}
+.wrap h1{font-size:clamp(32px,5vw,48px)}
+.lead{font-size:18px;color:var(--fg-2);margin:0}
+.box{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);padding:24px 24px 20px}
+.box h2{font-size:22px;margin-bottom:12px}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:14px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:12px;font-size:16px;line-height:1.5;color:var(--fg-2)}
+ol.steps li::before{content:counter(s);width:36px;height:36px;border-radius:50%;background:var(--surface);color:var(--accent);font-weight:700;display:grid;place-items:center}
+ol.steps b{color:var(--fg)}
+code{background:var(--surface);padding:2px 6px;border-radius:6px;font-size:15px}
+.ok{display:none;padding:14px 16px;border-radius:var(--r);background:var(--surface);font-weight:700;color:var(--accent)}
+html[data-lo-helper] .ok{display:block}
+.trust{display:grid;gap:8px;font-size:16px;color:var(--fg-2)}
+.trust p{margin:0}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="brand" href="index.html" style="color:var(--fg);text-decoration:none;font-weight:700">← Lot Outline</a>
+  <h1>Lot Outline Helper for Chrome</h1>
+  <p class="lead">The helper puts your finished photos and captions on your HAR listing for you. It works inside your own Chrome, in the Matrix tab you're already signed in to, so we never ask for your MLS login.</p>
+  <p class="ok">The helper is installed in this Chrome. Go back to your order and click Approve upload.</p>
+
+  <section class="box">
+    <h2>Add it to Chrome</h2>
+    <ol class="steps">
+      <li><span><b>Download the helper</b>: <a href="lot-outline-helper.zip" download>lot-outline-helper.zip</a>. Double-click it to unzip. You'll get a folder called <code>lot-outline-helper</code>.</span></li>
+      <li><span>In Chrome, go to <code>chrome://extensions</code> (type it in the address bar) and turn on <b>Developer mode</b> in the top right corner.</span></li>
+      <li><span>Click <b>Load unpacked</b> and pick the <code>lot-outline-helper</code> folder.</span></li>
+      <li><span>Come back to your order and click <b>Approve upload</b>.</span></li>
+    </ol>
+    <p style="margin:14px 0 0;font-size:15px;color:var(--muted)">This is the early-access install. Once the helper is in the Chrome Web Store it becomes a single "Add to Chrome" click.</p>
+  </section>
+
+  <section class="box trust">
+    <h2>What it does, and what it doesn't</h2>
+    <p><b>It does:</b> open Matrix in a new tab, find your listing, open Manage Photos, upload your Lot Outline photos after any that are already there, and type each caption into its photo's description box.</p>
+    <p><b>It doesn't:</b> see or save your MLS password, delete or reorder photos, change any other field, or click Certify and Save. You look everything over and click that yourself.</p>
+    <p><b>It only works on</b> lotoutline.com and matrix.harmls.com, and only when you've clicked Approve upload on an order. You can cancel any time from the helper's icon or the panel in Matrix.</p>
+  </section>
+</main>
+<script>/* the helper marks the page when it's installed */ setTimeout(() => { if (document.documentElement.dataset.loHelper) document.documentElement.setAttribute('data-lo-helper', ''); }, 400);</script>
+</body>
+</html>
